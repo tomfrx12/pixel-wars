@@ -22,6 +22,10 @@ RUN npm install
 # On copie le code du backend
 COPY server/ .
 
+# 🔥 FORCE LA COMPILATION DE SQLITE POUR LE CONTENEUR LINUX 🔥
+# Cette commande empêche l'erreur GLIBC en ignorant tout module précompilé externe
+RUN npm rebuild sqlite3 --build-from-source
+
 # On récupère le frontend compilé depuis l'étape 1 !
 COPY --from=build /app/client/dist /app/client/dist
 
