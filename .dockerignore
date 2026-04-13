@@ -1,0 +1,10 @@
+node_modules/
+client/node_modules/
+server/node_modules/
+dist/
+client/dist/
+.git/
+.env*
+server/users.db
+server/grid.json
+data/
