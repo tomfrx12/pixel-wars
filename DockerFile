@@ -1,28 +1,32 @@
-#contruction du de l'image et du build
-FROM node:22-alpine as build
-WORKDIR /app
-#copy des fichiers de dépendances
-COPY package*.json ./
-#node_modules
-RUN npm i
-#copy code source
-COPY . .
+# 1. Construction du Frontend (Vite/React)
+FROM node:20-alpine as build
+WORKDIR /app/client
+
+# On copie d'abord les dépendances du client
+COPY client/package*.json ./
+RUN npm install
+
+# On copie le reste du code client et on build
+COPY client/ .
 RUN npm run build
 
-#reprends nginx coté serveur
-FROM nginx:alpine
-#copy le build 'dist' là où nginx gere les sites web
-COPY --from=build /app/dist /usr/share/nginx/html
-#config nginx pour afficher la page
-RUN echo 'server { \
-    listen 80; \
-    root /usr/share/nginx/html; \
-    index index.html; \
-    location / { \
-        try_files $uri $uri/ /index.html; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
+# 2. Construction du Backend (Node.js/Express)
+# Note: On utilise node:20 (pas alpine) pour éviter les problèmes de compilation de SQLite
+FROM node:20 
+WORKDIR /app/server
 
-#conteneur est sur le port 80
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# On copie les dépendances du backend
+COPY server/package*.json ./
+RUN npm install
+
+# On copie le code du backend
+COPY server/ .
+
+# On récupère le frontend compilé depuis l'étape 1 !
+COPY --from=build /app/client/dist /app/client/dist
+
+# Port sur lequel le backend Node écoute (celui qu'on a configuré dans index.js)
+EXPOSE 3001
+
+# Commande pour démarrer le serveur (qui va gérer WebSockets, API et distribuer le Frontend)
+CMD ["node", "index.js"]
