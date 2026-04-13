@@ -1,0 +1,339 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { io } from 'socket.io-client';
+
+const SERVER_URL = ''; // Utilise le proxy Vite configuré pour rediriger vers localhost:3001
+
+const GRID_SIZE = 50;
+const PIXEL_SIZE = 15; // Taille d'un pixel à l'écran
+
+const FACTION_COLORS = {
+  red: '#ff0000',
+  blue: '#0044ff',
+  green: '#00ff00',
+  yellow: '#ffff00'
+};
+
+function App() {
+  const canvasRef = useRef(null);
+  
+  // --- GAME STATE ---
+  const [energy, setEnergy] = useState(100);
+  const [myTeam, setMyTeam] = useState('red');
+  const [myPixelsPlaced, setMyPixelsPlaced] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [error, setError] = useState("");
+  const [faction, setFaction] = useState('red');
+  const [scores, setScores] = useState({ red: 0, blue: 0, green: 0, yellow: 0 });
+  const [isBombMode, setIsBombMode] = useState(false);
+
+  // --- AUTH STATE ---
+  const [token, setToken] = useState(localStorage.getItem('token') || null);
+  const [username, setUsername] = useState(localStorage.getItem('username') || null);
+  const [authMode, setAuthMode] = useState('login'); // 'login' ou 'register'
+  const [authForm, setAuthForm] = useState({ username: '', password: '', team: 'red' });
+  const [authError, setAuthError] = useState("");
+  const [socket, setSocket] = useState(null);
+
+  // --- AUTH METHODS ---
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    try {
+      const endpoint = authMode === 'login' ? '/api/login' : '/api/register';
+      const res = await fetch(`${SERVER_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(authForm)
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || "Erreur d'authentification");
+      
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('username', data.username);
+      setToken(data.token);
+      setUsername(data.username);
+    } catch (err) {
+      setAuthError(err.message);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    setToken(null);
+    setUsername(null);
+    if (socket) socket.disconnect();
+  };
+
+  // --- SOCKET CONNECTION ---
+  useEffect(() => {
+    if (!token) return;
+
+    const newSocket = io(SERVER_URL, {
+      auth: { token }
+    });
+
+    newSocket.on('connect_error', (err) => {
+      setError(err.message);
+      if (err.message.includes('Accès refusé') || err.message.includes('invalide')) {
+        handleLogout(); // Force la reconnexion si token expiré / invalide
+      }
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [token]);
+
+  // --- GAME EVENTS ---
+  useEffect(() => {
+    if (!socket || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    const drawPixel = (x, y, color) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+      ctx.strokeStyle = '#ddd';
+      ctx.strokeRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+    };
+
+    socket.on('init-grid', (pixels) => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height); // On nettoie avant
+      Object.entries(pixels).forEach(([key, color]) => {
+        const [x, y] = key.split('-').map(Number);
+        drawPixel(x, y, color);
+      });
+    });
+
+    socket.on('update-pixel', ({ x, y, color }) => {
+      drawPixel(x, y, color);
+    });
+
+    socket.on('energy-update', (val) => {
+      setEnergy(val);
+    });
+
+    socket.on('stats-update', (stats) => {
+      if (stats.team) {
+        setMyTeam(stats.team);
+        setFaction(stats.team); // Pré-sélectionner sa team
+      }
+      if (stats.pixelsPlaced !== undefined) setMyPixelsPlaced(stats.pixelsPlaced);
+      if (stats.isAdmin !== undefined) setIsAdmin(stats.isAdmin);
+    });
+
+    socket.on('error-msg', (msg) => {
+      setError(msg);
+      setTimeout(() => setError(""), 3000); // Efface le message après 3s
+    });
+
+    socket.on('update-scores', (s) => {
+      setScores(s);
+    });
+
+    return () => {
+      socket.off('init-grid');
+      socket.off('update-pixel');
+      socket.off('energy-update');
+      socket.off('stats-update');
+      socket.off('error-msg');
+      socket.off('update-scores');
+    };
+  }, [socket]); // Re-run si la ref du socket change
+
+  const handleCanvasClick = (e) => {
+    if (!socket) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / PIXEL_SIZE);
+    const y = Math.floor((e.clientY - rect.top) / PIXEL_SIZE);
+
+    socket.emit('place-pixel', { x, y, color: FACTION_COLORS[faction], faction, isBomb: isBombMode });
+  };
+
+  // --- RENDU : ECRAN D'AUTHENTIFICATION ---
+  if (!token) {
+    return (
+      <div className="bg-[#1a1a1a] min-h-screen text-white font-mono flex flex-col items-center justify-center p-5">
+        <h1 className="text-[#00ff00] text-5xl font-bold mb-10 drop-shadow-[0_0_10px_rgba(0,255,0,0.8)]">
+          {">"} PIXEL_WARS_OS
+        </h1>
+        <div className="bg-[#222] border-2 border-[#333] p-8 rounded shadow-[0_0_20px_rgba(0,0,0,0.8)] w-[350px]">
+          <h2 className="text-[#00ff00] text-xl font-bold mb-6 text-center">
+            {authMode === 'login' ? '--- CONNEXION ---' : '--- INSCRIPTION ---'}
+          </h2>
+          
+          {authError && <p className="text-[#ff4444] mb-4 text-sm text-center font-bold">{authError}</p>}
+          
+          <form onSubmit={handleAuth} className="flex flex-col gap-4">
+            <div>
+              <label className="text-xs text-gray-400">PSEUDO (3 à 15 car.)</label>
+              <input 
+                type="text" 
+                value={authForm.username} 
+                onChange={e => setAuthForm({...authForm, username: e.target.value})}
+                className="w-full bg-[#1a1a1a] border border-gray-600 text-white px-3 py-2 outline-none focus:border-[#00ff00]"
+                required minLength={3} maxLength={15}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400">MOT DE PASSE</label>
+              <input 
+                type="password" 
+                value={authForm.password} 
+                onChange={e => setAuthForm({...authForm, password: e.target.value})}
+                className="w-full bg-[#1a1a1a] border border-gray-600 text-white px-3 py-2 outline-none focus:border-[#00ff00]"
+                required
+              />
+            </div>
+            {authMode === 'register' && (
+              <div>
+                <label className="text-xs text-gray-400">FACTION COULEUR</label>
+                <select 
+                  value={authForm.team} 
+                  onChange={e => setAuthForm({...authForm, team: e.target.value})}
+                  className="w-full bg-[#1a1a1a] border border-gray-600 text-white px-3 py-2 outline-none focus:border-[#00ff00]"
+                >
+                  <option value="red">Rouge</option>
+                  <option value="blue">Bleu</option>
+                  <option value="green">Vert</option>
+                  <option value="yellow">Jaune</option>
+                </select>
+              </div>
+            )}
+            
+            <button type="submit" className="bg-[#00ff00] text-black font-bold py-2 mt-4 hover:bg-[#00cc00] transition-colors cursor-pointer">
+              {authMode === 'login' ? 'ENTRER' : 'REJOINDRE LA GUERRE'}
+            </button>
+          </form>
+
+          <button 
+            onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); setAuthError(''); }}
+            className="w-full mt-6 text-xs text-gray-400 hover:text-white underline cursor-pointer"
+          >
+            {authMode === 'login' ? "Je n'ai pas de compte. M'inscrire." : "J'ai déjà un compte. Me connecter."}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- RENDU : ECRAN DU JEU ---
+  return (
+    <div className="bg-[#1a1a1a] min-h-screen text-white font-mono flex flex-col items-center p-5">
+      
+      {/* Header contenant le nom du joueur et bouton QUITTER */}
+      <div className="w-full max-w-[1200px] flex justify-between items-center mb-6">
+        <h1 className="text-[#00ff00] text-3xl font-bold drop-shadow-[0_0_10px_rgba(0,255,0,0.8)]">
+          {">"} PIXEL_WARS_OS.exe
+        </h1>
+        <div className="flex items-center gap-4">
+          <span className="text-gray-400 text-sm border border-gray-600 px-3 py-1 rounded bg-[#222]">
+            {isAdmin ? "👑 ADMIN :" : "ACCÈS AUTORISÉ :"} <span className={`font-bold`} style={{ color: FACTION_COLORS[myTeam] || '#00ff00' }}>{username}</span> ({myPixelsPlaced} pixels)
+          </span>
+          <button onClick={handleLogout} className="border border-[#ff4444] text-[#ff4444] px-4 py-1 text-sm rounded hover:bg-[#ff4444] hover:text-white transition-colors font-bold cursor-pointer">
+            EXIT
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-col lg:flex-row gap-10 items-start">
+        
+        {/* Colonne de gauche: Le Canvas */}
+        <div className="flex flex-col items-center">
+          <canvas
+            ref={canvasRef}
+            width={GRID_SIZE * PIXEL_SIZE}
+            height={GRID_SIZE * PIXEL_SIZE}
+            onClick={handleCanvasClick}
+            className="border-[3px] border-[#333] shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-white cursor-crosshair [image-rendering:pixelated]"
+          />
+        </div>
+
+        {/* Colonne de droite: Les Contrôles UI */}
+        <div className="flex flex-col w-[300px]">
+          
+          {/* Barre d'énergie */}
+          <div className="mb-6 text-center">
+            <div className="w-full h-[25px] border border-[#00ff00] relative mb-1">
+              <div 
+                className={`h-full transition-[width] duration-300 ease-in-out ${(energy >= 100 || isAdmin) ? 'bg-[#ff0000] shadow-[0_0_10px_#ff0000]' : 'bg-[#00ff00]'}`} 
+                style={{ width: isAdmin ? '100%' : `${energy}%` }} 
+              />
+              <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-black text-xs font-bold">
+                ENERGY: {isAdmin ? '∞ Admin' : `${energy}%`}
+              </span>
+            </div>
+            {error && <p className="text-[#ff4444] my-1 text-sm font-bold">{error}</p>}
+          </div>
+
+          <div className="bg-[#333] p-4 rounded mb-3 shadow-[0_0_10px_rgba(0,0,0,0.5)]">
+            <span className="text-gray-200 text-sm">FACTION :</span>
+            <select 
+              value={faction} 
+              disabled={!isAdmin}
+              onChange={(e) => {
+                const newTeam = e.target.value;
+                setFaction(newTeam);
+                if (isAdmin && socket) socket.emit('change-team', newTeam);
+              }} 
+              className={`bg-[#1a1a1a] text-white border p-1.5 w-full mt-1 outline-none ${isAdmin ? 'border-[#00ff00] cursor-pointer' : 'border-gray-600 cursor-not-allowed opacity-50'}`}
+            >
+              <option value="red">🔴 TEAM RED</option>
+              <option value="blue">🔵 TEAM BLUE</option>
+              <option value="green">🟢 TEAM GREEN</option>
+              <option value="yellow">🟡 TEAM YELLOW</option>
+            </select>
+          </div>
+
+          <div className="bg-[#333] p-4 rounded mb-3 shadow-[0_0_10px_rgba(0,0,0,0.5)]">
+            <span className="text-gray-200 text-sm">OUTIL :</span>
+            <div className="flex gap-2 mt-2">
+              <button 
+                onClick={() => setIsBombMode(false)}
+                className={`flex-1 py-1 px-2 text-sm font-bold border transition-colors cursor-pointer ${!isBombMode ? 'bg-[#00ff00] text-black border-[#00ff00]' : 'bg-[#1a1a1a] text-white border-gray-500 hover:border-[#00ff00]'}`}
+              >
+                PIXEL (5)
+              </button>
+              <button 
+                onClick={() => setIsBombMode(true)}
+                className={`flex-1 py-1 px-2 text-sm font-bold border transition-colors cursor-pointer ${isBombMode ? 'bg-[#ff0000] text-white border-[#ff0000]' : 'bg-[#1a1a1a] text-white border-gray-500 hover:border-[#ff0000]'}`}
+              >
+                BOMBE (30)
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-[#222] p-4 rounded border border-[#444] shadow-[0_0_10px_rgba(0,0,0,0.5)]">
+            <p className="text-[#00ff00] mb-2 font-bold text-center">--- DOMINATION ---</p>
+            <div className="space-y-1">
+              {[
+                { id: 'red', name: '🔴 Red', score: scores.red || 0 },
+                { id: 'blue', name: '🔵 Blue', score: scores.blue || 0 },
+                { id: 'green', name: '🟢 Green', score: scores.green || 0 },
+                { id: 'yellow', name: '🟡 Yellow', score: scores.yellow || 0 }
+              ]
+                .sort((a, b) => b.score - a.score)
+                .map((team, index) => (
+                  <div key={team.id} className="flex justify-between text-sm">
+                    <span>
+                      {index === 0 && '👑 '}
+                      {team.name}:
+                    </span> 
+                    <span className="font-bold">{team.score} px</span>
+                  </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default App;

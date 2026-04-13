@@ -1,0 +1,32 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Bases de données & Sauvegardes
+server/users.db
+server/grid.json
+
+# Fichiers d'environnement (Mots de passe, JWT_SECRET, etc.)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Fichiers OS
+.DS_Store
+Thumbs.db
+
+# Docker (si jamais il crée des volumes locaux)
+data/
