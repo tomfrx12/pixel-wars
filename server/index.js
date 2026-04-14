@@ -334,8 +334,8 @@ io.on('connection', (socket) => {
 // Distribue les fichiers statiques de Vite une fois le projet compile
 app.use(express.static(path.join(__dirname, '../client/dist')));
 
-// Toutes les requetes HTTP non gerees (qui ne sont pas /api/*) retournent l'application React
-app.get('*', (req, res) => {
+// Express 5.x : Le joker général n'est plus '*', mais une expression régulière catch-all
+app.get(/(.*)/, (req, res) => {
     res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
 });
 
