@@ -120,7 +120,7 @@ function setupSockets(io, state, JWT_SECRET) {
             const userFaction = isAdmin ? faction : (user.team || faction);
             let cost = 5;
             if (isNuke) cost = 100;
-            else if (isBomb) cost = 40;
+            else if (isBomb) cost = 20;
 
             if (!isAdmin && user.energy < cost) {
                 socket.emit('error-msg', `Pas assez d'énergie ! (${cost})`);
@@ -191,9 +191,9 @@ function setupSockets(io, state, JWT_SECRET) {
             });
 
             if (batch.length > 1) {
-                io.emit('update-pixel-batch', { pixels: batch, isNuke, isBomb });
+                io.emit('update-pixel-batch', { pixels: batch, isNuke, isBomb, username: username });
             } else if (batch.length === 1) {
-                io.emit('update-pixel', { ...batch[0], isNuke: false, isBomb: false });
+                io.emit('update-pixel', { ...batch[0], isNuke: false, isBomb: false, username: username });
             }
 
             if (!isAdmin) user.energy -= cost;

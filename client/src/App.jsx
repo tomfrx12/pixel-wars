@@ -228,7 +228,7 @@ function App() {
       const { x, y, color, faction, username: pUsername, isBomb, isNuke } = pixel;
       gridStateRef.current[`${x}-${y}`] = { color, faction, username: pUsername };
       
-      // Mise à jour incrémentale du cache (très rapide)
+      // Mise à jour incrémentale du cache
       if (offscreenCanvasRef.current) {
         const oCtx = offscreenCanvasRef.current.getContext('2d');
         oCtx.fillStyle = color;
@@ -237,11 +237,9 @@ function App() {
       
       drawGrid();
 
-      // --- FILTRE SONORE : LOGIQUE CORRIGÉE ---
-      const myUsername = localStorage.getItem('username'); // Récupération propre du pseudo local
-      
-      if (pUsername === myUsername) {
-        // C'EST MOI : Je joue tous mes sons
+      // --- FILTRE SONORE STRICT ---
+      // On ne joue le son QUE si le pseudo qui a posé le pixel est LE NOTRE
+      if (pUsername === localStorage.getItem('username')) {
         if (isNuke) {
           playSound('nuke');
           setIsNukeTriggered(true);
@@ -251,20 +249,11 @@ function App() {
         } else {
           playSound('pixel');
         }
-      } else {
-        // C'EST UN AUTRE (OU UN BOT) : Je ne joue que les sons d'impacts globaux
-        if (isNuke) {
-          playSound('nuke');
-          setIsNukeTriggered(true);
-          setTimeout(() => setIsNukeTriggered(false), 500);
-        } else if (isBomb) {
-          playSound('bomb');
-        }
-        // LE SON 'PIXEL' EST VOLONTAIREMENT IGNORÉ ICI
       }
+      // Si ce n'est pas nous, on ne joue ABSOLUMENT RIEN (ni pixel, ni bombe, ni nuke)
     });
 
-    socket.on('update-pixel-batch', ({ pixels, isNuke, isBomb }) => {
+    socket.on('update-pixel-batch', ({ pixels, isNuke, isBomb, username: batchUser }) => {
       const oCtx = offscreenCanvasRef.current ? offscreenCanvasRef.current.getContext('2d') : null;
       
       pixels.forEach(({ x, y, color, faction, username }) => {
@@ -277,13 +266,16 @@ function App() {
       
       drawGrid();
 
-      // Pour les batchs (bombes/nukes), on joue le son pour tout le monde car c'est un événement global
-      if (isNuke) {
-        playSound('nuke');
-        setIsNukeTriggered(true);
-        setTimeout(() => setIsNukeTriggered(false), 500);
-      } else if (isBomb) {
-        playSound('bomb');
+      // --- FILTRE SONORE BATCH STRICT ---
+      // On vérifie si c'est nous qui avons lancé le batch (Bombe/Nuke)
+      if (batchUser === localStorage.getItem('username')) {
+        if (isNuke) {
+          playSound('nuke');
+          setIsNukeTriggered(true);
+          setTimeout(() => setIsNukeTriggered(false), 500);
+        } else if (isBomb) {
+          playSound('bomb');
+        }
       }
     });
 
@@ -582,7 +574,7 @@ function App() {
                   onClick={() => { setIsBombMode(true); setIsNukeMode(false); }}
                   className={`flex-1 py-1 px-2 text-sm font-bold border transition-colors cursor-pointer ${isBombMode ? 'bg-[#ffaa00] text-black border-[#ffaa00]' : 'bg-[#1a1a1a] text-white border-gray-500 hover:border-[#ffaa00]'}`}
                 >
-                  BOMBE (40)
+                  BOMBE (20)
                 </button>
               </div>
               <button 

@@ -58,8 +58,8 @@ for (let i = 0; i < NUM_BOTS; i++) {
         }
       }
 
-      // 2. Tenter une BOMBE (Cout: 25)
-      if (energy >= 25) {
+      // 2. Tenter une BOMBE (Cout: 20)
+      if (energy >= 20) {
         if (Math.random() > 0.8) { // 20% de chance d'envoyer une BOMBE
           const x = Math.floor(Math.random() * 200);
           const y = Math.floor(Math.random() * 200);
