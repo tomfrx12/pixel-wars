@@ -139,8 +139,9 @@ app.post('/api/register', async (req, res) => {
     // 1 & 2. Validation et nettoyage avec Zod
     const validation = authSchema.safeParse(req.body);
     if (!validation.success) {
-        // Renvoie la première erreur trouvée par Zod
-        return res.status(400).json({ error: validation.error.errors[0].message });
+        // Sécurise la lecture de l'erreur générée par Zod pour ne jamais crasher
+        const errMsg = validation.error?.errors?.[0]?.message || "Format de données invalide";
+        return res.status(400).json({ error: errMsg });
     }
 
     const { username, password, team } = validation.data;
