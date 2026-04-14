@@ -78,25 +78,22 @@ function setupSockets(io, state, JWT_SECRET) {
 
             const pixelsToUpdate = [];
             if (isBomb) {
-                // Rayon d'explosion défini jusqu'à 4 (soit un carré max de 9x9 pixels)
-                for (let dx = -4; dx <= 4; dx++) {
-                    for (let dy = -4; dy <= 4; dy++) {
+                // Zone maximale (de -2 à +2 équivaut à un carré 5x5 environ)
+                for (let dx = -2; dx <= 2; dx++) {
+                    for (let dy = -2; dy <= 2; dy++) {
                         const distance = Math.max(Math.abs(dx), Math.abs(dy));
-                        
-                        // Cœur de l'explosion : un carré dense de 3x3 (= distance 0 ou 1)
-                        if (distance <= 1) {
+
+                        // Cœur de l'explosion (le pixel central est à 100%)
+                        if (distance === 0) {
                             pixelsToUpdate.push({ px: x + dx, py: y + dy });
-                        } 
-                        // Éclats : distance 2, 3 ou 4 (probabilité aléatoire décroissante)
-                        else {
-                            let chance = 0;
-                            if (distance === 2) chance = 0.5;      // 50% de chance
-                            else if (distance === 3) chance = 0.25; // 25% de chance
-                            else if (distance === 4) chance = 0.1;  // 10% de chance
-                            
-                            if (Math.random() < chance) {
-                                pixelsToUpdate.push({ px: x + dx, py: y + dy });
-                            }
+                        }
+                        // Périmètre immédiat (2x2 / 3x3) : très forte densité (75% de chance)
+                        else if (distance === 1 && Math.random() < 0.75) {
+                            pixelsToUpdate.push({ px: x + dx, py: y + dy });
+                        }
+                        // Gouttes aléatoires éparpillées (périmètre 4x4 / 5x5) : faible densité (20% de chance)
+                        else if (distance === 2 && Math.random() < 0.20) {
+                            pixelsToUpdate.push({ px: x + dx, py: y + dy });
                         }
                     }
                 }
