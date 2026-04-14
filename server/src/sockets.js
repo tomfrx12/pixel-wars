@@ -79,10 +79,12 @@ function setupSockets(io, state, JWT_SECRET) {
             sendAdminLog(`🔄 CHANGEMENT EQUIPE : ${username} -> ${newTeam}`);
         });
 
-        socket.on('place-pixel', ({ x, y, color, faction, isBomb }) => {
+        socket.on('place-pixel', ({ x, y, color, faction, isBomb, isNuke }) => {
             const isAdmin = user.isAdmin === 1;
             const userFaction = isAdmin ? faction : (user.team || faction);
-            const cost = isBomb ? 40 : 5;
+            let cost = 5;
+            if (isNuke) cost = 100;
+            else if (isBomb) cost = 40;
 
             if (!isAdmin && user.energy < cost) {
                 socket.emit('error-msg', `Pas assez d'énergie ! (${cost})`);
@@ -93,7 +95,22 @@ function setupSockets(io, state, JWT_SECRET) {
             const activeColor = FACTION_COLORS[userFaction] || color;
 
             const pixelsToUpdate = [];
-            if (isBomb) {
+            if (isNuke) {
+                // Zone NUKE (7x7 environ) avec dispersion aléatoire plus large
+                for (let dx = -4; dx <= 4; dx++) {
+                    for (let dy = -4; dy <= 4; dy++) {
+                        const distance = Math.sqrt(dx*dx + dy*dy); // Distance euclidienne pour un cercle
+                        
+                        if (distance <= 1.5) { // Centre dense
+                            pixelsToUpdate.push({ px: x + dx, py: y + dy });
+                        } else if (distance <= 3 && Math.random() < 0.6) { // Milieu moyennement dense
+                            pixelsToUpdate.push({ px: x + dx, py: y + dy });
+                        } else if (distance <= 4.5 && Math.random() < 0.25) { // Bordures très dispersées
+                            pixelsToUpdate.push({ px: x + dx, py: y + dy });
+                        }
+                    }
+                }
+            } else if (isBomb) {
                 // Zone maximale (de -2 à +2 équivaut à un carré 5x5 environ)
                 for (let dx = -2; dx <= 2; dx++) {
                     for (let dy = -2; dy <= 2; dy++) {
@@ -140,7 +157,10 @@ function setupSockets(io, state, JWT_SECRET) {
 
             socket.emit('energy-update', user.energy);
             socket.emit('stats-update', { team: user.team, pixelsPlaced: user.pixelsPlaced, isAdmin: user.isAdmin === 1 });
-            const actionType = isBomb ? '💣 BOMBE' : '🖌️ PIXEL';
+            let actionType = '🖌️ PIXEL';
+            if (isNuke) actionType = '☢️ NUKE';
+            else if (isBomb) actionType = '💣 BOMBE';
+            
             console.log(`🎮 [${username}] ${actionType} : Faction ${userFaction}`);
             sendAdminLog(`${actionType} : ${username} en (${x}, ${y}) pour la faction ${userFaction}`);
         });

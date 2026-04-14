@@ -28,6 +28,7 @@ function App() {
   const [faction, setFaction] = useState('red');
   const [scores, setScores] = useState({ red: 0, blue: 0, green: 0, yellow: 0 });
   const [isBombMode, setIsBombMode] = useState(false);
+  const [isNukeMode, setIsNukeMode] = useState(false);
 
   // --- AUTH STATE ---
   const [token, setToken] = useState(localStorage.getItem('token') || null);
@@ -162,7 +163,14 @@ function App() {
     const x = Math.floor((e.clientX - rect.left) / PIXEL_SIZE);
     const y = Math.floor((e.clientY - rect.top) / PIXEL_SIZE);
 
-    socket.emit('place-pixel', { x, y, color: FACTION_COLORS[faction], faction, isBomb: isBombMode });
+    socket.emit('place-pixel', { 
+      x, 
+      y, 
+      color: FACTION_COLORS[faction], 
+      faction, 
+      isBomb: isBombMode,
+      isNuke: isNukeMode 
+    });
   };
 
   const handleCanvasMouseMove = (e) => {
@@ -327,18 +335,26 @@ function App() {
 
           <div className="bg-[#333] p-4 rounded mb-3 shadow-[0_0_10px_rgba(0,0,0,0.5)]">
             <span className="text-gray-200 text-sm">OUTIL :</span>
-            <div className="flex gap-2 mt-2">
+            <div className="flex flex-col gap-2 mt-2">
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => { setIsBombMode(false); setIsNukeMode(false); }}
+                  className={`flex-1 py-1 px-2 text-sm font-bold border transition-colors cursor-pointer ${(!isBombMode && !isNukeMode) ? 'bg-[#00ff00] text-black border-[#00ff00]' : 'bg-[#1a1a1a] text-white border-gray-500 hover:border-[#00ff00]'}`}
+                >
+                  PIXEL (5)
+                </button>
+                <button 
+                  onClick={() => { setIsBombMode(true); setIsNukeMode(false); }}
+                  className={`flex-1 py-1 px-2 text-sm font-bold border transition-colors cursor-pointer ${isBombMode ? 'bg-[#ffaa00] text-black border-[#ffaa00]' : 'bg-[#1a1a1a] text-white border-gray-500 hover:border-[#ffaa00]'}`}
+                >
+                  BOMBE (40)
+                </button>
+              </div>
               <button 
-                onClick={() => setIsBombMode(false)}
-                className={`flex-1 py-1 px-2 text-sm font-bold border transition-colors cursor-pointer ${!isBombMode ? 'bg-[#00ff00] text-black border-[#00ff00]' : 'bg-[#1a1a1a] text-white border-gray-500 hover:border-[#00ff00]'}`}
+                onClick={() => { setIsNukeMode(true); setIsBombMode(false); }}
+                className={`w-full py-1.5 px-2 text-sm font-bold border transition-all cursor-pointer ${isNukeMode ? 'bg-[#ff0000] text-white border-[#ff0000] animate-pulse shadow-[0_0_10px_#ff0000]' : 'bg-[#1a1a1a] text-[#ff4444] border-[#ff4444] hover:bg-[#ff4444] hover:text-white'}`}
               >
-                PIXEL (5)
-              </button>
-              <button 
-                onClick={() => setIsBombMode(true)}
-                className={`flex-1 py-1 px-2 text-sm font-bold border transition-colors cursor-pointer ${isBombMode ? 'bg-[#ff0000] text-white border-[#ff0000]' : 'bg-[#1a1a1a] text-white border-gray-500 hover:border-[#ff0000]'}`}
-              >
-                BOMBE (40)
+                ☢️ NUKE (100)
               </button>
             </div>
           </div>
