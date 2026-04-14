@@ -70,6 +70,7 @@ function App() {
   const [hoverPixel, setHoverPixel] = useState(null); // { x, y, faction, username }
   const [adminLogs, setAdminLogs] = useState([]);
   const [adminUsers, setAdminUsers] = useState([]); // Liste des connectés pour l'admin
+  const [totalPlayers, setTotalPlayers] = useState(0); // Nouveau compteur global
   const [energy, setEnergy] = useState(100);
   const [myTeam, setMyTeam] = useState('red');
   const [myPixelsPlaced, setMyPixelsPlaced] = useState(0);
@@ -310,6 +311,10 @@ function App() {
       setScores(s);
     });
 
+    socket.on('total-players-update', (count) => {
+      setTotalPlayers(count);
+    });
+
     // --- BLOQUER LE SCROLL DE LA PAGE SUR LE CANVAS ---
     const preventWheel = (e) => {
       e.preventDefault();
@@ -495,6 +500,9 @@ function App() {
           {">"} PIXEL_WARS_OS.exe
         </h1>
         <div className="flex items-center gap-4">
+          <span className="text-[#00ff00] text-xs font-bold bg-[#1a1a1a] border border-[#333] px-3 py-1 rounded-full animate-pulse shadow-[0_0_5px_rgba(0,255,0,0.3)]">
+            ● {totalPlayers} CONNECTÉS
+          </span>
           <span className="text-gray-400 text-sm border border-gray-600 px-3 py-1 rounded bg-[#222]">
             {isAdmin ? "👑 ADMIN :" : "ACCÈS AUTORISÉ :"} <span className={`font-bold`} style={{ color: FACTION_COLORS[myTeam] || '#00ff00' }}>{username}</span> ({myPixelsPlaced} pixels)
           </span>

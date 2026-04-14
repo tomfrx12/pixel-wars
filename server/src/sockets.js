@@ -3,7 +3,11 @@ const jwt = require('jsonwebtoken');
 function setupSockets(io, state, JWT_SECRET) {
     setInterval(() => {
         io.emit('update-scores', state.scores);
-    }, 500);
+        
+        // --- COMPTEUR DE JOUEURS GLOBAL ---
+        const totalConnected = io.sockets.sockets.size; // Nombre brut de sockets
+        io.emit('total-players-update', totalConnected);
+    }, 1000);
 
     function getGridColors() {
         const out = {};
