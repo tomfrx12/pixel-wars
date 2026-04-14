@@ -18,10 +18,18 @@ for (let i = 0; i < NUM_BOTS; i++) {
     // Note: On utilise l'URL interne via Docker-Compose si possible
     const socket = io(SERVER_URL, {
         reconnectionDelayMax: 10000,
-        rejectUnauthorized: false, // Utile pour ignorer les erreurs SSL en prod interne
-        transports: ['websocket'] // Force le WebSocket pour éviter les soucis de polling
+        rejectUnauthorized: false,
+        transports: ['websocket']
     });
-    
+
+    socket.on('connect_error', (err) => {
+      console.error(`❌ Bot ${i} erreur de connexion :`, err.message);
+    });
+
+    socket.on('error-msg', (msg) => {
+      console.warn(`⚠️ Bot ${i} reçu erreur du serveur :`, msg);
+    });
+
     socket.on('connect', () => {
       // Pour éviter le spam dans la console si un bot perd la connexion et la retrouve, on affiche ça 1 seule fois :
       if (!socket.hasConnectedOnce) {
