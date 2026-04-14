@@ -3,8 +3,8 @@ import { io } from 'socket.io-client';
 
 const SERVER_URL = ''; // Utilise le proxy Vite configuré pour rediriger vers localhost:3001
 
-const GRID_SIZE = 500;
-const PIXEL_SIZE = 4; // Garde la taille de pixel mais la map sera x2.5 plus grande !
+const GRID_SIZE = 200;
+const PIXEL_SIZE = 4; // Taille standard pour 200x200
 
 // --- SYSTEME AUDIO OPTIMISÉ (SINGLETON) ---
 let audioCtx = null;
