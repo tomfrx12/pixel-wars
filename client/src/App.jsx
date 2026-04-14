@@ -230,7 +230,20 @@ function App() {
       setScores(s);
     });
 
+    // --- BLOQUER LE SCROLL DE LA PAGE SUR LE CANVAS ---
+    const preventWheel = (e) => {
+      e.preventDefault();
+    };
+    
+    const canvasElement = canvasRef.current;
+    if (canvasElement) {
+      canvasElement.addEventListener('wheel', preventWheel, { passive: false });
+    }
+
     return () => {
+      if (canvasElement) {
+        canvasElement.removeEventListener('wheel', preventWheel);
+      }
       socket.off('init-grid');
       socket.off('update-pixel');
       socket.off('energy-update');
@@ -241,10 +254,7 @@ function App() {
   }, [socket, zoom, offset]); // Re-run si le zoom ou l'offset change
 
   const handleWheel = (e) => {
-    // Empêcher le scroll de la page quand on zoom sur le canvas
-    if (e.cancelable) {
-      e.preventDefault();
-    }
+    // Le preventDefault est maintenant géré par l'addEventListener ci-dessus
     const scaleAmount = -e.deltaY * 0.001;
     const newZoom = Math.min(Math.max(zoom + scaleAmount, 0.1), 10);
     
@@ -407,7 +417,7 @@ function App() {
 
   // --- RENDU : ECRAN DU JEU ---
   return (
-    <div className={`bg-[#1a1a1a] min-h-screen text-white font-mono flex flex-col items-center p-5 transition-colors duration-200 overflow-hidden ${isNukeTriggered ? '!bg-white blur-sm' : ''}`}>
+    <div className={`fixed inset-0 bg-[#1a1a1a] text-white font-mono flex flex-col items-center p-5 transition-colors duration-200 overflow-hidden ${isNukeTriggered ? '!bg-white blur-sm' : ''}`}>
       
       {/* Header contenant le nom du joueur et bouton QUITTER */}
       <div className={`w-full max-w-[1200px] flex justify-between items-center mb-6 transition-opacity ${isNukeTriggered ? 'opacity-0' : 'opacity-100'}`}>
