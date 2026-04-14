@@ -75,6 +75,12 @@ function App() {
   const [isNukeMode, setIsNukeMode] = useState(false);
   const [isNukeTriggered, setIsNukeTriggered] = useState(false);
 
+  // --- ZOOM & PAN STATE ---
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
+
   // --- AUTH STATE ---
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [username, setUsername] = useState(localStorage.getItem('username') || null);
@@ -151,26 +157,51 @@ function App() {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
-    const drawPixel = (x, y, color) => {
-      ctx.fillStyle = color;
-      ctx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
-      ctx.strokeStyle = '#ddd';
-      ctx.strokeRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+    const drawGrid = () => {
+      ctx.save();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Appliquer les transformations de zoom et de déplacement
+      ctx.translate(offset.x, offset.y);
+      ctx.scale(zoom, zoom);
+
+      // Fond blanc pour la grille
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, GRID_SIZE * PIXEL_SIZE, GRID_SIZE * PIXEL_SIZE);
+
+      // Dessiner tous les pixels stockés
+      Object.entries(gridStateRef.current).forEach(([key, pixelInfo]) => {
+        const [x, y] = key.split('-').map(Number);
+        ctx.fillStyle = pixelInfo.color || pixelInfo;
+        ctx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+        
+        // Bordures des pixels (uniquement si le zoom est suffisant pour voir les détails)
+        if (zoom > 0.5) {
+          ctx.strokeStyle = '#ddd';
+          ctx.lineWidth = 0.5 / zoom;
+          ctx.strokeRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+        }
+      });
+
+      // Bordure de la carte
+      ctx.strokeStyle = '#00ff00';
+      ctx.lineWidth = 2 / zoom;
+      ctx.strokeRect(0, 0, GRID_SIZE * PIXEL_SIZE, GRID_SIZE * PIXEL_SIZE);
+
+      ctx.restore();
     };
 
+    // On redessine quand le zoom ou l'offset change
+    drawGrid();
+
     socket.on('init-grid', (pixels) => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height); // On nettoie avant 
-      gridStateRef.current = pixels; // On sauvegarde toutes les infos pour le survol
-      Object.entries(pixels).forEach(([key, pixelInfo]) => {
-        const [x, y] = key.split('-').map(Number);
-        // On récupère toujours que la couleur pour dessiner
-        drawPixel(x, y, pixelInfo.color || pixelInfo);
-      });
+      gridStateRef.current = pixels;
+      drawGrid();
     });
 
     socket.on('update-pixel', ({ x, y, color, faction, username }) => {
       gridStateRef.current[`${x}-${y}`] = { color, faction, username };
-      drawPixel(x, y, color);
+      drawGrid();
     });
 
     socket.on('admin-log', (logMsg) => {
@@ -207,13 +238,59 @@ function App() {
       socket.off('error-msg');
       socket.off('update-scores');
     };
-  }, [socket]); // Re-run si la ref du socket change
+  }, [socket, zoom, offset]); // Re-run si le zoom ou l'offset change
+
+  const handleWheel = (e) => {
+    e.preventDefault();
+    const scaleAmount = -e.deltaY * 0.001;
+    const newZoom = Math.min(Math.max(zoom + scaleAmount, 0.1), 10);
+    
+    // Zoomer vers la souris
+    const rect = canvasRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    // Calculer la nouvelle position pour garder le point sous la souris
+    const newOffsetX = mouseX - (mouseX - offset.x) * (newZoom / zoom);
+    const newOffsetY = mouseY - (mouseY - offset.y) * (newZoom / zoom);
+    
+    setZoom(newZoom);
+    setOffset({ x: newOffsetX, y: newOffsetY });
+  };
+
+  const handleMouseDown = (e) => {
+    if (e.button === 1 || e.altKey) { // Clic milieu ou Alt+Clic pour déplacer
+      setIsDragging(true);
+      setLastMousePos({ x: e.clientX, y: e.clientY });
+    }
+  };
+
+  const handleMouseMove = (e) => {
+    if (isDragging) {
+      const dx = e.clientX - lastMousePos.x;
+      const dy = e.clientY - lastMousePos.y;
+      setOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+      setLastMousePos({ x: e.clientX, y: e.clientY });
+    }
+    handleCanvasMouseMove(e);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
 
   const handleCanvasClick = (e) => {
-    if (!socket) return;
+    if (!socket || isDragging) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) / PIXEL_SIZE);
-    const y = Math.floor((e.clientY - rect.top) / PIXEL_SIZE);
+    
+    // Transformer les coordonnées écran en coordonnées grille (tenant compte du zoom/offset)
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    const x = Math.floor((mouseX - offset.x) / (PIXEL_SIZE * zoom));
+    const y = Math.floor((mouseY - offset.y) / (PIXEL_SIZE * zoom));
+
+    if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) return;
 
     if (isNukeMode) {
       if (energy >= 100 || isAdmin) {
@@ -240,8 +317,12 @@ function App() {
   const handleCanvasMouseMove = (e) => {
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) / PIXEL_SIZE);
-    const y = Math.floor((e.clientY - rect.top) / PIXEL_SIZE);
+    
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    const x = Math.floor((mouseX - offset.x) / (PIXEL_SIZE * zoom));
+    const y = Math.floor((mouseY - offset.y) / (PIXEL_SIZE * zoom));
     
     // Extrait les informations sauvegardées pour ce bloc (depuis les init/updates)
     const key = `${x}-${y}`;
@@ -348,10 +429,14 @@ function App() {
             ref={canvasRef}
             width={GRID_SIZE * PIXEL_SIZE}
             height={GRID_SIZE * PIXEL_SIZE}
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
             onClick={handleCanvasClick}
-            onMouseMove={handleCanvasMouseMove}
-            onMouseLeave={() => setHoverPixel(null)}
+            onMouseLeave={() => { setHoverPixel(null); setIsDragging(false); }}
             className={`border-[3px] border-[#333] shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-white cursor-crosshair [image-rendering:pixelated] transition-all ${isNukeTriggered ? 'border-white shadow-[0_0_50px_#fff]' : ''}`}
+            style={{ width: '800px', height: '800px' }} // Taille fixe pour l'affichage, le zoom gère l'intérieur
           />
           {/* Panneau d'informations du pixel survolé (Visible pour tous) */}
           <div className="h-8 mt-2 text-sm text-[#00ff00] font-bold flex items-center justify-center">
