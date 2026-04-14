@@ -237,14 +237,28 @@ function App() {
       
       drawGrid();
 
-      if (isNuke) {
-        playSound('nuke');
-        setIsNukeTriggered(true);
-        setTimeout(() => setIsNukeTriggered(false), 1500);
-      } else if (isBomb) {
-        playSound('bomb');
+      // --- FILTRE SONORE ---
+      // On ne joue le bip que si c'est NOUS qui posons le pixel
+      if (username === localStorage.getItem('username')) {
+        if (isNuke) {
+          playSound('nuke');
+          setIsNukeTriggered(true);
+          setTimeout(() => setIsNukeTriggered(false), 500);
+        } else if (isBomb) {
+          playSound('bomb');
+        } else {
+          playSound('pixel');
+        }
       } else {
-        playSound('pixel');
+        // Pour les autres joueurs/bots, on ne joue QUE les sons d'impact importants (Bomb/Nuke)
+        if (isNuke) {
+          playSound('nuke');
+          setIsNukeTriggered(true);
+          setTimeout(() => setIsNukeTriggered(false), 500);
+        } else if (isBomb) {
+          playSound('bomb');
+        }
+        // Le son 'pixel' est ignoré ici pour les autres
       }
     });
 
@@ -261,10 +275,11 @@ function App() {
       
       drawGrid();
 
+      // Pour les batchs (bombes/nukes), on joue le son pour tout le monde car c'est un événement global
       if (isNuke) {
         playSound('nuke');
         setIsNukeTriggered(true);
-        setTimeout(() => setIsNukeTriggered(false), 500); // Réduit à 500ms au lieu de 1500ms
+        setTimeout(() => setIsNukeTriggered(false), 500);
       } else if (isBomb) {
         playSound('bomb');
       }
