@@ -69,6 +69,7 @@ function App() {
   // --- GAME STATE ---
   const [hoverPixel, setHoverPixel] = useState(null); // { x, y, faction, username }
   const [adminLogs, setAdminLogs] = useState([]);
+  const [adminUsers, setAdminUsers] = useState([]); // Liste des connectés pour l'admin
   const [energy, setEnergy] = useState(100);
   const [myTeam, setMyTeam] = useState('red');
   const [myPixelsPlaced, setMyPixelsPlaced] = useState(0);
@@ -281,6 +282,10 @@ function App() {
 
     socket.on('admin-log', (logMsg) => {
       setAdminLogs(prev => [logMsg, ...prev].slice(0, 20)); // Garde seulement les 20 derniers logs
+    });
+
+    socket.on('admin-users-list', (users) => {
+      setAdminUsers(users);
     });
 
     socket.on('energy-update', (val) => {
@@ -610,20 +615,41 @@ function App() {
 
           {/* ESPACE ADMIN LOGS */}
           {isAdmin && (
-            <div className="mt-4 flex flex-col gap-2">
+            <div className="mt-4 flex flex-col gap-3">
+              <div className="bg-[#111] p-3 rounded border border-[#00ff00] shadow-[0_0_15px_rgba(0,255,0,0.2)]">
+                <p className="text-[#00ff00] mb-2 font-bold text-xs text-center uppercase tracking-widest">--- JOUEURS CONNECTÉS ({adminUsers.length}) ---</p>
+                <div className="space-y-1 h-32 overflow-y-auto text-[10px] font-mono">
+                  {adminUsers.length === 0 ? <span className="text-gray-500 opacity-50 italic">Aucun utilisateur...</span> : null}
+                  {adminUsers.map((u, i) => (
+                    <div key={i} className="flex justify-between items-center bg-[#1a1a1a] p-1.5 rounded border border-gray-800 mb-1 hover:border-gray-600 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: FACTION_COLORS[u.team] || '#fff' }}></div>
+                        <span className={u.isBot ? 'text-blue-400 italic' : 'text-white'}>
+                          {u.username} {u.isAdmin && '👑'} {u.isBot && '(bot)'}
+                        </span>
+                      </div>
+                      <div className="flex gap-3 text-gray-500">
+                        <span>⚡ {u.energy}%</span>
+                        <span className="uppercase text-[8px] opacity-70">[{u.team}]</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <button 
                 onClick={handleResetGrid}
-                className="w-full bg-[#ff0000] text-white py-2 rounded font-bold hover:bg-[#cc0000] transition-colors border-2 border-white/20 shadow-[0_0_10px_rgba(255,0,0,0.5)] cursor-pointer text-xs"
+                className="w-full bg-[#ff0000] text-white py-2 rounded font-bold hover:bg-[#cc0000] transition-colors border-2 border-white/20 shadow-[0_0_10px_rgba(255,0,0,0.5)] cursor-pointer text-xs uppercase"
               >
                 🚨 RÉINITIALISER LA GRILLE
               </button>
               
               <div className="bg-[#111] p-3 rounded border border-red-500 shadow-[0_0_10px_rgba(255,0,0,0.3)]">
-                <p className="text-red-500 mb-2 font-bold text-xs text-center">--- ADMIN LOGS ---</p>
+                <p className="text-red-500 mb-2 font-bold text-xs text-center uppercase tracking-widest">--- ADMIN LOGS ---</p>
                 <div className="space-y-1 h-32 overflow-y-auto text-[10px] text-gray-300 font-mono">
-                  {adminLogs.length === 0 ? <span className="opacity-50">Aucun log en cours...</span> : null}
+                  {adminLogs.length === 0 ? <span className="text-gray-500 opacity-50 italic text-center block">Attente de logs...</span> : null}
                   {adminLogs.map((log, i) => (
-                    <div key={i} className="border-b border-gray-800 pb-1">{log}</div>
+                    <div key={i} className="border-b border-gray-900 pb-1 last:border-0 hover:text-white transition-colors">{log}</div>
                   ))}
                 </div>
               </div>

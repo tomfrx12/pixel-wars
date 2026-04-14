@@ -27,6 +27,36 @@ function setupSockets(io, state, JWT_SECRET) {
         });
     }
 
+    function updateConnectedUsers() {
+        const connected = [];
+        const seen = new Set();
+        
+        io.sockets.sockets.forEach(s => {
+            if (s.username && !seen.has(s.username)) {
+                seen.add(s.username);
+                const u = state.users[s.username];
+                if (u) {
+                    connected.push({
+                        username: s.username,
+                        team: u.team,
+                        isAdmin: u.isAdmin === 1,
+                        isBot: !!s.isBot,
+                        energy: u.energy
+                    });
+                }
+            }
+        });
+
+        // Envoyer uniquement aux admins
+        io.sockets.sockets.forEach(s => {
+            if (s.username && state.users[s.username] && state.users[s.username].isAdmin === 1) {
+                s.emit('admin-users-list', connected);
+            }
+        });
+    }
+
+    setInterval(updateConnectedUsers, 2000); // Mise à jour toutes les 2s
+
     io.use((socket, next) => {
         const token = socket.handshake.auth.token;
         
