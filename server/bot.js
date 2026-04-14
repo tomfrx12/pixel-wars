@@ -1,7 +1,7 @@
 const { io } = require("socket.io-client");
 
-const NUM_BOTS = 100; // Nombre d'utilisateurs simultanés
-const SERVER_URL = "http://172.21.10.255:3001/"; // L'URL de votre serveur
+const NUM_BOTS = process.env.NUM_BOTS || 10; // Valeur par défaut plus prudente
+const SERVER_URL = process.env.SERVER_URL || "http://localhost:80"; // URL dynamique pour la prod
 const FACTIONS = ["red", "blue", "green", "yellow"];
 const COLORS = {
   red: '#ff0000',
@@ -10,14 +10,17 @@ const COLORS = {
   yellow: '#ffff00'
 };
 
-console.log(`🚀 Lancement de ${NUM_BOTS} bots sur le Pixel Wars...`);
+console.log(`🚀 Lancement de ${NUM_BOTS} bots sur ${SERVER_URL}...`);
 
 for (let i = 0; i < NUM_BOTS; i++) {
-  // Étaler les connexions pour ne pas saturer le réseau instantanément
+  // Étaler les connexions
   setTimeout(() => {
-    const socket = io(SERVER_URL);
-    const faction = FACTIONS[Math.floor(Math.random() * FACTIONS.length)];
-    const color = COLORS[faction];
+    // Note: Le serveur attend un token JWT normalement,
+    // mais si ton serveur accepte les connexions sans token (à vérifier), 
+    // ou si tu as désactivé l'auth pour les bots :
+    const socket = io(SERVER_URL, {
+        reconnectionDelayMax: 10000,
+    });
     
     socket.on('connect', () => {
       // Pour éviter le spam dans la console si un bot perd la connexion et la retrouve, on affiche ça 1 seule fois :
