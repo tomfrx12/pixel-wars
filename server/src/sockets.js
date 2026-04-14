@@ -66,7 +66,7 @@ function setupSockets(io, state, JWT_SECRET) {
         socket.on('place-pixel', ({ x, y, color, faction, isBomb }) => {
             const isAdmin = user.isAdmin === 1;
             const userFaction = isAdmin ? faction : (user.team || faction);
-            const cost = isBomb ? 30 : 5;
+            const cost = isBomb ? 40 : 5;
 
             if (!isAdmin && user.energy < cost) {
                 socket.emit('error-msg', `Pas assez d'énergie ! (${cost})`);
@@ -78,9 +78,26 @@ function setupSockets(io, state, JWT_SECRET) {
 
             const pixelsToUpdate = [];
             if (isBomb) {
-                for (let dx = -1; dx <= 1; dx++) {
-                    for (let dy = -1; dy <= 1; dy++) {
-                        pixelsToUpdate.push({ px: x + dx, py: y + dy });
+                // Rayon d'explosion défini jusqu'à 4 (soit un carré max de 9x9 pixels)
+                for (let dx = -4; dx <= 4; dx++) {
+                    for (let dy = -4; dy <= 4; dy++) {
+                        const distance = Math.max(Math.abs(dx), Math.abs(dy));
+                        
+                        // Cœur de l'explosion : un carré dense de 3x3 (= distance 0 ou 1)
+                        if (distance <= 1) {
+                            pixelsToUpdate.push({ px: x + dx, py: y + dy });
+                        } 
+                        // Éclats : distance 2, 3 ou 4 (probabilité aléatoire décroissante)
+                        else {
+                            let chance = 0;
+                            if (distance === 2) chance = 0.5;      // 50% de chance
+                            else if (distance === 3) chance = 0.25; // 25% de chance
+                            else if (distance === 4) chance = 0.1;  // 10% de chance
+                            
+                            if (Math.random() < chance) {
+                                pixelsToUpdate.push({ px: x + dx, py: y + dy });
+                            }
+                        }
                     }
                 }
             } else {

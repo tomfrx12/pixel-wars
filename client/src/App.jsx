@@ -303,7 +303,7 @@ function App() {
                 onClick={() => setIsBombMode(true)}
                 className={`flex-1 py-1 px-2 text-sm font-bold border transition-colors cursor-pointer ${isBombMode ? 'bg-[#ff0000] text-white border-[#ff0000]' : 'bg-[#1a1a1a] text-white border-gray-500 hover:border-[#ff0000]'}`}
               >
-                BOMBE (30)
+                BOMBE (40)
               </button>
             </div>
           </div>
