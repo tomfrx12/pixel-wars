@@ -339,6 +339,8 @@ app.get(/(.*)/, (req, res) => {
     res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
 });
 
-server.listen(3001, () => {
-    console.log('Serveur Pixel Wars prêt sur le port 3001');
+// Écoute sur le port 80 si spécifié, ou fallback
+const PORT = process.env.PORT || 80;
+server.listen(PORT, () => {
+    console.log(`Serveur Pixel Wars prêt sur le port ${PORT}`);
 });

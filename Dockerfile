@@ -30,7 +30,7 @@ RUN npm rebuild sqlite3 --build-from-source
 COPY --from=build /app/client/dist /app/client/dist
 
 # Port sur lequel le backend Node écoute (celui qu'on a configuré dans index.js)
-EXPOSE 3001
+EXPOSE 80
 
 # Commande pour démarrer le serveur (qui va gérer WebSockets, API et distribuer le Frontend)
 CMD ["node", "index.js"]
