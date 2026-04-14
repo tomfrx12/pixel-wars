@@ -8,9 +8,23 @@ function setupSockets(io, state, JWT_SECRET) {
     function getGridColors() {
         const out = {};
         Object.entries(state.pixels).forEach(([key, value]) => {
-            out[key] = value && value.color ? value.color : value;
+            if (value && value.color) {
+                out[key] = {
+                    color: value.color,
+                    faction: value.faction,
+                    username: value.username
+                };
+            }
         });
         return out;
+    }
+
+    function sendAdminLog(message) {
+        io.sockets.sockets.forEach(s => {
+            if (s.username && state.users[s.username] && state.users[s.username].isAdmin === 1) {
+                s.emit('admin-log', `[${new Date().toLocaleTimeString()}] ${message}`);
+            }
+        });
     }
 
     io.use((socket, next) => {
@@ -49,6 +63,7 @@ function setupSockets(io, state, JWT_SECRET) {
         }
 
         console.log(`✅ ${username} s'est connecté.`);
+        sendAdminLog(`🟢 CONNEXION : ${username}`);
         const user = state.users[username];
 
         socket.emit('energy-update', user.energy);
@@ -61,6 +76,7 @@ function setupSockets(io, state, JWT_SECRET) {
             user.team = newTeam;
             socket.emit('stats-update', { team: user.team, pixelsPlaced: user.pixelsPlaced, isAdmin: true });
             console.log(`👑 [${username}] a changé pour : ${newTeam}`);
+            sendAdminLog(`🔄 CHANGEMENT EQUIPE : ${username} -> ${newTeam}`);
         });
 
         socket.on('place-pixel', ({ x, y, color, faction, isBomb }) => {
@@ -112,10 +128,10 @@ function setupSockets(io, state, JWT_SECRET) {
                         if (state.scores[oldPixel.faction] > 0) state.scores[oldPixel.faction]--;
                     }
 
-                    state.pixels[key] = { color: activeColor, faction: userFaction };
+                    state.pixels[key] = { color: activeColor, faction: userFaction, username: username };
                     if (state.scores[userFaction] !== undefined) state.scores[userFaction]++;
                     
-                    io.emit('update-pixel', { x: px, y: py, color: activeColor });
+                    io.emit('update-pixel', { x: px, y: py, color: activeColor, faction: userFaction, username: username });
                     user.pixelsPlaced = (user.pixelsPlaced || 0) + 1;
                 }
             });
@@ -124,11 +140,14 @@ function setupSockets(io, state, JWT_SECRET) {
 
             socket.emit('energy-update', user.energy);
             socket.emit('stats-update', { team: user.team, pixelsPlaced: user.pixelsPlaced, isAdmin: user.isAdmin === 1 });
-            console.log(`🎮 [${username}] ${isBomb ? 'Bombe' : 'Pixel'} : Faction ${userFaction}`);
+            const actionType = isBomb ? '💣 BOMBE' : '🖌️ PIXEL';
+            console.log(`🎮 [${username}] ${actionType} : Faction ${userFaction}`);
+            sendAdminLog(`${actionType} : ${username} en (${x}, ${y}) pour la faction ${userFaction}`);
         });
 
         socket.on('disconnect', () => {
             console.log(`❌ ${username} s'est déconnecté.`);
+            sendAdminLog(`🔴 DECONNEXION : ${username}`);
         });
     });
 }

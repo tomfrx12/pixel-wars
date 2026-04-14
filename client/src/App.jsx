@@ -15,8 +15,11 @@ const FACTION_COLORS = {
 
 function App() {
   const canvasRef = useRef(null);
-  
+  const gridStateRef = useRef({}); // Stockera la faction et le username pour le survol
+
   // --- GAME STATE ---
+  const [hoverPixel, setHoverPixel] = useState(null); // { x, y, faction, username }
+  const [adminLogs, setAdminLogs] = useState([]);
   const [energy, setEnergy] = useState(100);
   const [myTeam, setMyTeam] = useState('red');
   const [myPixelsPlaced, setMyPixelsPlaced] = useState(0);
@@ -103,16 +106,22 @@ function App() {
     };
 
     socket.on('init-grid', (pixels) => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height); // On nettoie avant
-      Object.entries(pixels).forEach(([key, color]) => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height); // On nettoie avant 
+      gridStateRef.current = pixels; // On sauvegarde toutes les infos pour le survol
+      Object.entries(pixels).forEach(([key, pixelInfo]) => {
         const [x, y] = key.split('-').map(Number);
-        drawPixel(x, y, color);
+        // On récupère toujours que la couleur pour dessiner
+        drawPixel(x, y, pixelInfo.color || pixelInfo);
       });
     });
 
-    socket.on('update-pixel', ({ x, y, color }) => {
+    socket.on('update-pixel', ({ x, y, color, faction, username }) => {
+      gridStateRef.current[`${x}-${y}`] = { color, faction, username };
       drawPixel(x, y, color);
     });
+
+    socket.on('admin-log', (logMsg) => {
+      setAdminLogs(prev => [logMsg, ...prev].slice(0, 20)); // Garde seulement les 20 derniers logs
 
     socket.on('energy-update', (val) => {
       setEnergy(val);
@@ -153,6 +162,23 @@ function App() {
     const y = Math.floor((e.clientY - rect.top) / PIXEL_SIZE);
 
     socket.emit('place-pixel', { x, y, color: FACTION_COLORS[faction], faction, isBomb: isBombMode });
+  };
+
+  const handleCanvasMouseMove = (e) => {
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / PIXEL_SIZE);
+    const y = Math.floor((e.clientY - rect.top) / PIXEL_SIZE);
+    
+    // Extrait les informations sauvegardées pour ce bloc (depuis les init/updates)
+    const key = `${x}-${y}`;
+    const info = gridStateRef.current[key];
+    
+    if (info && info.username) {
+      setHoverPixel({ x, y, ...info });
+    } else {
+      setHoverPixel(null);
+    }
   };
 
   // --- RENDU : ECRAN D'AUTHENTIFICATION ---
@@ -250,8 +276,16 @@ function App() {
             width={GRID_SIZE * PIXEL_SIZE}
             height={GRID_SIZE * PIXEL_SIZE}
             onClick={handleCanvasClick}
+            onMouseMove={handleCanvasMouseMove}
+            onMouseLeave={() => setHoverPixel(null)}
             className="border-[3px] border-[#333] shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-white cursor-crosshair [image-rendering:pixelated]"
           />
+          {/* Panneau d'informations du pixel survolé (Visible pour tous) */}
+          <div className="h-8 mt-2 text-sm text-[#00ff00] font-bold flex items-center justify-center">
+            {hoverPixel ? (
+              <span>[X:{hoverPixel.x} Y:{hoverPixel.y}] Faction <span style={{color: hoverPixel.color}}>{hoverPixel.faction}</span>, par : {hoverPixel.username}</span>
+            ) : "Survolez la grille..."}
+          </div>
         </div>
 
         {/* Colonne de droite: Les Contrôles UI */}
@@ -323,12 +357,25 @@ function App() {
                     <span>
                       {index === 0 && '👑 '}
                       {team.name}:
-                    </span> 
+                    </span>
                     <span className="font-bold">{team.score} px</span>
                   </div>
               ))}
             </div>
           </div>
+
+          {/* ESPACE ADMIN LOGS */}
+          {isAdmin && (
+            <div className="mt-4 bg-[#111] p-3 rounded border border-red-500 shadow-[0_0_10px_rgba(255,0,0,0.3)]">
+              <p className="text-red-500 mb-2 font-bold text-xs text-center">--- ADMIN LOGS ---</p>
+              <div className="space-y-1 h-32 overflow-y-auto text-[10px] text-gray-300 font-mono">
+                {adminLogs.length === 0 ? <span className="opacity-50">Aucun log en cours...</span> : null}
+                {adminLogs.map((log, i) => (
+                  <div key={i} className="border-b border-gray-800 pb-1">{log}</div>
+                ))}
+              </div>
+            </div>
+          )}
 
         </div>
       </div>
