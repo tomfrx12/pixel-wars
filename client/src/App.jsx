@@ -225,8 +225,8 @@ function App() {
     });
 
     socket.on('update-pixel', (pixel) => {
-      const { x, y, color, faction, username, isBomb, isNuke } = pixel;
-      gridStateRef.current[`${x}-${y}`] = { color, faction, username };
+      const { x, y, color, faction, username: pUsername, isBomb, isNuke } = pixel;
+      gridStateRef.current[`${x}-${y}`] = { color, faction, username: pUsername };
       
       // Mise à jour incrémentale du cache (très rapide)
       if (offscreenCanvasRef.current) {
@@ -237,9 +237,11 @@ function App() {
       
       drawGrid();
 
-      // --- FILTRE SONORE ---
-      // On ne joue le bip que si c'est NOUS qui posons le pixel
-      if (username === localStorage.getItem('username')) {
+      // --- FILTRE SONORE : LOGIQUE CORRIGÉE ---
+      const myUsername = localStorage.getItem('username'); // Récupération propre du pseudo local
+      
+      if (pUsername === myUsername) {
+        // C'EST MOI : Je joue tous mes sons
         if (isNuke) {
           playSound('nuke');
           setIsNukeTriggered(true);
@@ -250,7 +252,7 @@ function App() {
           playSound('pixel');
         }
       } else {
-        // Pour les autres joueurs/bots, on ne joue QUE les sons d'impact importants (Bomb/Nuke)
+        // C'EST UN AUTRE (OU UN BOT) : Je ne joue que les sons d'impacts globaux
         if (isNuke) {
           playSound('nuke');
           setIsNukeTriggered(true);
@@ -258,7 +260,7 @@ function App() {
         } else if (isBomb) {
           playSound('bomb');
         }
-        // Le son 'pixel' est ignoré ici pour les autres
+        // LE SON 'PIXEL' EST VOLONTAIREMENT IGNORÉ ICI
       }
     });
 
