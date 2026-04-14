@@ -96,16 +96,21 @@ function setupSockets(io, state, JWT_SECRET) {
 
             const pixelsToUpdate = [];
             if (isNuke) {
-                // Zone NUKE (7x7 environ) avec dispersion aléatoire plus large
-                for (let dx = -4; dx <= 4; dx++) {
-                    for (let dy = -4; dy <= 4; dy++) {
-                        const distance = Math.sqrt(dx*dx + dy*dy); // Distance euclidienne pour un cercle
+                // Zone NUKE dévastatrice (rayon de 7 pixels)
+                for (let dx = -8; dx <= 8; dx++) {
+                    for (let dy = -8; dy <= 8; dy++) {
+                        const distance = Math.sqrt(dx*dx + dy*dy);
                         
-                        if (distance <= 1.5) { // Centre dense
+                        // Centre massif (rayon 4) : 100% de remplissage
+                        if (distance <= 4) {
                             pixelsToUpdate.push({ px: x + dx, py: y + dy });
-                        } else if (distance <= 3 && Math.random() < 0.6) { // Milieu moyennement dense
+                        } 
+                        // Onde de choc (rayon 4 à 6.5) : 70% de chance
+                        else if (distance <= 6.5 && Math.random() < 0.7) {
                             pixelsToUpdate.push({ px: x + dx, py: y + dy });
-                        } else if (distance <= 4.5 && Math.random() < 0.25) { // Bordures très dispersées
+                        } 
+                        // Retombées (rayon 6.5 à 9) : 30% de chance
+                        else if (distance <= 9 && Math.random() < 0.3) {
                             pixelsToUpdate.push({ px: x + dx, py: y + dy });
                         }
                     }

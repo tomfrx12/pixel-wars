@@ -29,6 +29,7 @@ function App() {
   const [scores, setScores] = useState({ red: 0, blue: 0, green: 0, yellow: 0 });
   const [isBombMode, setIsBombMode] = useState(false);
   const [isNukeMode, setIsNukeMode] = useState(false);
+  const [isNukeTriggered, setIsNukeTriggered] = useState(false);
 
   // --- AUTH STATE ---
   const [token, setToken] = useState(localStorage.getItem('token') || null);
@@ -163,6 +164,13 @@ function App() {
     const x = Math.floor((e.clientX - rect.left) / PIXEL_SIZE);
     const y = Math.floor((e.clientY - rect.top) / PIXEL_SIZE);
 
+    if (isNukeMode) {
+      if (energy >= 100 || isAdmin) {
+        setIsNukeTriggered(true);
+        setTimeout(() => setIsNukeTriggered(false), 300); // 300ms de flash blanc
+      }
+    }
+
     socket.emit('place-pixel', { 
       x, 
       y, 
@@ -259,10 +267,10 @@ function App() {
 
   // --- RENDU : ECRAN DU JEU ---
   return (
-    <div className="bg-[#1a1a1a] min-h-screen text-white font-mono flex flex-col items-center p-5">
+    <div className={`bg-[#1a1a1a] min-h-screen text-white font-mono flex flex-col items-center p-5 transition-colors duration-200 ${isNukeTriggered ? '!bg-white blur-sm' : ''}`}>
       
       {/* Header contenant le nom du joueur et bouton QUITTER */}
-      <div className="w-full max-w-[1200px] flex justify-between items-center mb-6">
+      <div className={`w-full max-w-[1200px] flex justify-between items-center mb-6 transition-opacity ${isNukeTriggered ? 'opacity-0' : 'opacity-100'}`}>
         <h1 className="text-[#00ff00] text-3xl font-bold drop-shadow-[0_0_10px_rgba(0,255,0,0.8)]">
           {">"} PIXEL_WARS_OS.exe
         </h1>
@@ -276,7 +284,7 @@ function App() {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-10 items-start">
+      <div className={`flex flex-col lg:flex-row gap-10 items-start transition-transform ${isNukeTriggered ? 'scale-[1.1] rotate-1' : 'scale-100'}`}>
         
         {/* Colonne de gauche: Le Canvas */}
         <div className="flex flex-col items-center">
@@ -287,7 +295,7 @@ function App() {
             onClick={handleCanvasClick}
             onMouseMove={handleCanvasMouseMove}
             onMouseLeave={() => setHoverPixel(null)}
-            className="border-[3px] border-[#333] shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-white cursor-crosshair [image-rendering:pixelated]"
+            className={`border-[3px] border-[#333] shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-white cursor-crosshair [image-rendering:pixelated] transition-all ${isNukeTriggered ? 'border-white shadow-[0_0_50px_#fff]' : ''}`}
           />
           {/* Panneau d'informations du pixel survolé (Visible pour tous) */}
           <div className="h-8 mt-2 text-sm text-[#00ff00] font-bold flex items-center justify-center">
