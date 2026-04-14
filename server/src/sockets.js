@@ -132,67 +132,56 @@ function setupSockets(io, state, JWT_SECRET) {
 
             const pixelsToUpdate = [];
             if (isNuke) {
-                // Zone NUKE dévastatrice (rayon de 7 pixels)
-                for (let dx = -8; dx <= 8; dx++) {
-                    for (let dy = -8; dy <= 8; dy++) {
-                        const distance = Math.sqrt(dx*dx + dy*dy);
-                        
-                        // Centre massif (rayon 4) : 100% de remplissage
-                        if (distance <= 4) {
-                            pixelsToUpdate.push({ px: x + dx, py: y + dy });
-                        } 
-                        // Onde de choc (rayon 4 à 6.5) : 70% de chance
-                        else if (distance <= 6.5 && Math.random() < 0.7) {
-                            pixelsToUpdate.push({ px: x + dx, py: y + dy });
-                        } 
-                        // Retombées (rayon 6.5 à 9) : 30% de chance
-                        else if (distance <= 9 && Math.random() < 0.3) {
-                            pixelsToUpdate.push({ px: x + dx, py: y + dy });
-                        }
+                // Zone NUKE dévastatrice
+                for (let dx = -9; dx <= 9; dx++) {
+                    const nx = x + dx;
+                    if (nx < 0 || nx >= state.GRID_SIZE) continue;
+                    for (let dy = -9; dy <= 9; dy++) {
+                        const ny = y + dy;
+                        if (ny < 0 || ny >= state.GRID_SIZE) continue;
+                        const dSq = dx*dx + dy*dy;
+                        if (dSq <= 16) pixelsToUpdate.push({ px: nx, py: ny });
+                        else if (dSq <= 42 && Math.random() < 0.7) pixelsToUpdate.push({ px: nx, py: ny });
+                        else if (dSq <= 81 && Math.random() < 0.3) pixelsToUpdate.push({ px: nx, py: ny });
                     }
                 }
             } else if (isBomb) {
-                // Zone maximale (de -2 à +2 équivaut à un carré 5x5 environ)
-                for (let dx = -2; dx <= 2; dx++) {
-                    for (let dy = -2; dy <= 2; dy++) {
-                        const distance = Math.max(Math.abs(dx), Math.abs(dy));
-
-                        // Cœur de l'explosion (le pixel central est à 100%)
-                        if (distance === 0) {
-                            pixelsToUpdate.push({ px: x + dx, py: y + dy });
-                        }
-                        // Périmètre immédiat (2x2 / 3x3) : très forte densité (75% de chance)
-                        else if (distance === 1 && Math.random() < 0.75) {
-                            pixelsToUpdate.push({ px: x + dx, py: y + dy });
-                        }
-                        // Gouttes aléatoires éparpillées (périmètre 4x4 / 5x5) : faible densité (20% de chance)
-                        else if (distance === 2 && Math.random() < 0.20) {
-                            pixelsToUpdate.push({ px: x + dx, py: y + dy });
-                        }
+                for (let dx = -3; dx <= 3; dx++) {
+                    const nx = x + dx;
+                    if (nx < 0 || nx >= state.GRID_SIZE) continue;
+                    for (let dy = -3; dy <= 3; dy++) {
+                        const ny = y + dy;
+                        if (ny < 0 || ny >= state.GRID_SIZE) continue;
+                        if (Math.abs(dx) + Math.abs(dy) <= 4) pixelsToUpdate.push({ px: nx, py: ny });
                     }
                 }
             } else {
                 pixelsToUpdate.push({ px: x, py: y });
             }
 
+            // --- OPTIMISATION : ENVOI GROUPÉ ---
+            const batch = [];
             pixelsToUpdate.forEach(({ px, py }) => {
-                if (px >= 0 && px < state.GRID_SIZE && py >= 0 && py < state.GRID_SIZE) {
-                    const key = `${px}-${py}`;
-                    const oldPixel = state.pixels[key];
+                const key = `${px}-${py}`;
+                const oldPixel = state.pixels[key];
+                if (oldPixel && oldPixel.faction === userFaction) return;
 
-                    if (oldPixel && oldPixel.faction === userFaction) return;
-
-                    if (oldPixel && oldPixel.faction && state.scores[oldPixel.faction] !== undefined) {
-                        if (state.scores[oldPixel.faction] > 0) state.scores[oldPixel.faction]--;
-                    }
-
-                    state.pixels[key] = { color: activeColor, faction: userFaction, username: username };
-                    if (state.scores[userFaction] !== undefined) state.scores[userFaction]++;
-                    
-                    io.emit('update-pixel', { x: px, y: py, color: activeColor, faction: userFaction, username: username });
-                    user.pixelsPlaced = (user.pixelsPlaced || 0) + 1;
+                if (oldPixel && oldPixel.faction && state.scores[oldPixel.faction] !== undefined) {
+                    if (state.scores[oldPixel.faction] > 0) state.scores[oldPixel.faction]--;
                 }
+
+                state.pixels[key] = { color: activeColor, faction: userFaction, username: username };
+                if (state.scores[userFaction] !== undefined) state.scores[userFaction]++;
+                
+                batch.push({ x: px, y: py, color: activeColor, faction: userFaction, username: username });
+                user.pixelsPlaced = (user.pixelsPlaced || 0) + 1;
             });
+
+            if (batch.length > 1) {
+                io.emit('update-pixel-batch', { pixels: batch, isNuke, isBomb });
+            } else if (batch.length === 1) {
+                io.emit('update-pixel', { ...batch[0], isNuke: false, isBomb: false });
+            }
 
             if (!isAdmin) user.energy -= cost;
 

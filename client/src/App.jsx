@@ -59,6 +59,7 @@ const FACTION_COLORS = {
 
 function App() {
   const canvasRef = useRef(null);
+  const offscreenCanvasRef = useRef(null); // Canvas en mémoire
   const gridStateRef = useRef({}); // Stockera la faction et le username pour le survol
 
   // --- GAME STATE ---
@@ -157,31 +158,50 @@ function App() {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
+    // --- OPTIMISATION : CACHE OFFSCREEN ---
+    // On dessine l'état des pixels sur un canvas invisible une seule fois, 
+    // puis le rendu principal n'a qu'à faire un seul "drawImage" très rapide.
+    const updateOffscreen = () => {
+      if (!offscreenCanvasRef.current) {
+        offscreenCanvasRef.current = document.createElement('canvas');
+        offscreenCanvasRef.current.width = GRID_SIZE * PIXEL_SIZE;
+        offscreenCanvasRef.current.height = GRID_SIZE * PIXEL_SIZE;
+      }
+      const oCtx = offscreenCanvasRef.current.getContext('2d', { alpha: false });
+      oCtx.imageSmoothingEnabled = false; // Désactiver l'anti-aliasing pour le pixel art
+      
+      // Fond blanc
+      oCtx.fillStyle = '#ffffff';
+      oCtx.fillRect(0, 0, offscreenCanvasRef.current.width, offscreenCanvasRef.current.height);
+
+      // Dessiner tous les pixels du cache
+      Object.entries(gridStateRef.current).forEach(([key, pixelInfo]) => {
+        const [x, y] = key.split('-').map(Number);
+        oCtx.fillStyle = pixelInfo.color || pixelInfo;
+        oCtx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+      });
+    };
+
     const drawGrid = () => {
+      if (!offscreenCanvasRef.current) updateOffscreen();
+      
       ctx.save();
+      ctx.imageSmoothingEnabled = false; // Performance et netteté
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      // Appliquer les transformations de zoom et de déplacement
+      // Appliquer les transformations
       ctx.translate(offset.x, offset.y);
       ctx.scale(zoom, zoom);
 
-      // Fond blanc pour la grille
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, GRID_SIZE * PIXEL_SIZE, GRID_SIZE * PIXEL_SIZE);
+      // Rendu ultra-rapide du cache de pixels (un seul drawImage au lieu de 40 000 rects)
+      ctx.drawImage(offscreenCanvasRef.current, 0, 0);
 
-      // Dessiner tous les pixels stockés
-      Object.entries(gridStateRef.current).forEach(([key, pixelInfo]) => {
-        const [x, y] = key.split('-').map(Number);
-        ctx.fillStyle = pixelInfo.color || pixelInfo;
-        ctx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
-        
-        // Bordures des pixels (uniquement si le zoom est suffisant pour voir les détails)
-        if (zoom > 0.5) {
-          ctx.strokeStyle = '#ddd';
-          ctx.lineWidth = 0.5 / zoom;
-          ctx.strokeRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
-        }
-      });
+      // Bordures des pixels (uniquement si le zoom est suffisant)
+      if (zoom > 1.5) {
+        ctx.strokeStyle = '#ddd';
+        ctx.lineWidth = 0.5 / zoom;
+        // Optionnel: on pourrait dessiner une grille ici si besoin
+      }
 
       // Bordure de la carte
       ctx.strokeStyle = '#00ff00';
@@ -196,12 +216,54 @@ function App() {
 
     socket.on('init-grid', (pixels) => {
       gridStateRef.current = pixels;
+      updateOffscreen();
       drawGrid();
     });
 
-    socket.on('update-pixel', ({ x, y, color, faction, username }) => {
+    socket.on('update-pixel', (pixel) => {
+      const { x, y, color, faction, username, isBomb, isNuke } = pixel;
       gridStateRef.current[`${x}-${y}`] = { color, faction, username };
+      
+      // Mise à jour incrémentale du cache (très rapide)
+      if (offscreenCanvasRef.current) {
+        const oCtx = offscreenCanvasRef.current.getContext('2d');
+        oCtx.fillStyle = color;
+        oCtx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+      }
+      
       drawGrid();
+
+      if (isNuke) {
+        playSound('nuke');
+        setIsNukeTriggered(true);
+        setTimeout(() => setIsNukeTriggered(false), 1500);
+      } else if (isBomb) {
+        playSound('bomb');
+      } else {
+        playSound('pixel');
+      }
+    });
+
+    socket.on('update-pixel-batch', ({ pixels, isNuke, isBomb }) => {
+      const oCtx = offscreenCanvasRef.current ? offscreenCanvasRef.current.getContext('2d') : null;
+      
+      pixels.forEach(({ x, y, color, faction, username }) => {
+        gridStateRef.current[`${x}-${y}`] = { color, faction, username };
+        if (oCtx) {
+          oCtx.fillStyle = color;
+          oCtx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+        }
+      });
+      
+      drawGrid();
+
+      if (isNuke) {
+        playSound('nuke');
+        setIsNukeTriggered(true);
+        setTimeout(() => setIsNukeTriggered(false), 1500);
+      } else if (isBomb) {
+        playSound('bomb');
+      }
     });
 
     socket.on('admin-log', (logMsg) => {
