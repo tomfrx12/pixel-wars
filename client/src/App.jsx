@@ -241,7 +241,10 @@ function App() {
   }, [socket, zoom, offset]); // Re-run si le zoom ou l'offset change
 
   const handleWheel = (e) => {
-    e.preventDefault();
+    // Empêcher le scroll de la page quand on zoom sur le canvas
+    if (e.cancelable) {
+      e.preventDefault();
+    }
     const scaleAmount = -e.deltaY * 0.001;
     const newZoom = Math.min(Math.max(zoom + scaleAmount, 0.1), 10);
     
@@ -404,7 +407,7 @@ function App() {
 
   // --- RENDU : ECRAN DU JEU ---
   return (
-    <div className={`bg-[#1a1a1a] min-h-screen text-white font-mono flex flex-col items-center p-5 transition-colors duration-200 ${isNukeTriggered ? '!bg-white blur-sm' : ''}`}>
+    <div className={`bg-[#1a1a1a] min-h-screen text-white font-mono flex flex-col items-center p-5 transition-colors duration-200 overflow-hidden ${isNukeTriggered ? '!bg-white blur-sm' : ''}`}>
       
       {/* Header contenant le nom du joueur et bouton QUITTER */}
       <div className={`w-full max-w-[1200px] flex justify-between items-center mb-6 transition-opacity ${isNukeTriggered ? 'opacity-0' : 'opacity-100'}`}>
