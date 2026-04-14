@@ -122,6 +122,7 @@ function App() {
 
     socket.on('admin-log', (logMsg) => {
       setAdminLogs(prev => [logMsg, ...prev].slice(0, 20)); // Garde seulement les 20 derniers logs
+    });
 
     socket.on('energy-update', (val) => {
       setEnergy(val);
