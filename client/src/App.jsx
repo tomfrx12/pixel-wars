@@ -492,7 +492,7 @@ function App() {
 
   // --- RENDU : ECRAN DU JEU ---
   return (
-    <div className={`fixed inset-0 bg-[#1a1a1a] text-white font-mono flex flex-col items-center p-5 transition-colors duration-200 overflow-hidden ${isNukeTriggered ? '!bg-white blur-sm' : ''}`}>
+    <div className={`min-h-screen bg-[#1a1a1a] text-white font-mono flex flex-col items-center p-5 transition-colors duration-200 ${isNukeTriggered ? '!bg-white blur-sm' : ''}`}>
       
       {/* Header contenant le nom du joueur et bouton QUITTER */}
       <div className={`w-full max-w-[1200px] flex justify-between items-center mb-6 transition-opacity ${isNukeTriggered ? 'opacity-0' : 'opacity-100'}`}>
