@@ -15,7 +15,7 @@ const state = {
     pixels: {},
     users: {},
     scores: { red: 0, blue: 0, green: 0, yellow: 0 },
-    GRID_SIZE: 50,
+    GRID_SIZE: 100,
     db: null
 };
 

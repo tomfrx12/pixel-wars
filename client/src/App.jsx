@@ -3,8 +3,8 @@ import { io } from 'socket.io-client';
 
 const SERVER_URL = ''; // Utilise le proxy Vite configuré pour rediriger vers localhost:3001
 
-const GRID_SIZE = 50;
-const PIXEL_SIZE = 15; // Taille d'un pixel à l'écran
+const GRID_SIZE = 100;
+const PIXEL_SIZE = 8; // Taille réduite pour que la carte de 100x100 tienne à l'écran
 
 const playSound = (type) => {
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
