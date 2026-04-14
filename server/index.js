@@ -339,6 +339,12 @@ app.get(/(.*)/, (req, res) => {
     res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
 });
 
+// Empêche Express de renvoyer de l'HTML (le fameux <!DOCTYPE...) quand une base de données crash en arrière-plan
+app.use((err, req, res, next) => {
+    console.error("❌ Erreur serveur attrapée :", err);
+    res.status(500).json({ error: "Erreur interne du serveur : " + (err.message || "Erreur inconnue") });
+});
+
 // Écoute sur le port 80 si spécifié, ou fallback
 const PORT = process.env.PORT || 80;
 server.listen(PORT, () => {
