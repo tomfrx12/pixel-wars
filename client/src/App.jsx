@@ -308,6 +308,7 @@ function App() {
       }
       socket.off('init-grid');
       socket.off('update-pixel');
+      socket.off('update-pixel-batch'); // Nettoyage de l'événement batch
       socket.off('energy-update');
       socket.off('stats-update');
       socket.off('error-msg');
@@ -358,7 +359,7 @@ function App() {
     if (!socket || isDragging) return;
     const rect = canvasRef.current.getBoundingClientRect();
     
-    // Transformer les coordonnées écran en coordonnées grille (tenant compte du zoom/offset)
+    // Transformer les coordonnées écran en coordonnées grille
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     
@@ -367,18 +368,7 @@ function App() {
 
     if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) return;
 
-    if (isNukeMode) {
-      if (energy >= 100 || isAdmin) {
-        setIsNukeTriggered(true);
-        playSound('nuke');
-        setTimeout(() => setIsNukeTriggered(false), 300); // 300ms de flash blanc
-      }
-    } else if (isBombMode) {
-      if (energy >= 40 || isAdmin) playSound('bomb');
-    } else {
-      if (energy >= 5 || isAdmin) playSound('pixel');
-    }
-
+    // Pas besoin de jouer le son ici, il sera joué à la réception de l'événement socket
     socket.emit('place-pixel', { 
       x, 
       y, 
