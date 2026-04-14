@@ -284,7 +284,7 @@ function App() {
           {/* Panneau d'informations du pixel survolé (Visible pour tous) */}
           <div className="h-8 mt-2 text-sm text-[#00ff00] font-bold flex items-center justify-center">
             {hoverPixel ? (
-              <span>[X:{hoverPixel.x} Y:{hoverPixel.y}] Faction <span style={{color: hoverPixel.color}}>{hoverPixel.faction}</span>, par : {hoverPixel.username}</span>
+              <span>Faction <span style={{color: hoverPixel.color}}>{hoverPixel.faction}</span>, par : {hoverPixel.username}</span>
             ) : "Survolez la grille..."}
           </div>
         </div>
