@@ -15,11 +15,11 @@ console.log(`🚀 Lancement de ${NUM_BOTS} bots sur ${SERVER_URL}...`);
 for (let i = 0; i < NUM_BOTS; i++) {
   // Étaler les connexions
   setTimeout(() => {
-    // Note: Le serveur attend un token JWT normalement,
-    // mais si ton serveur accepte les connexions sans token (à vérifier), 
-    // ou si tu as désactivé l'auth pour les bots :
+    // Note: On utilise l'URL interne via Docker-Compose si possible
     const socket = io(SERVER_URL, {
         reconnectionDelayMax: 10000,
+        rejectUnauthorized: false, // Utile pour ignorer les erreurs SSL en prod interne
+        transports: ['websocket'] // Force le WebSocket pour éviter les soucis de polling
     });
     
     socket.on('connect', () => {
