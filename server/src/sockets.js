@@ -29,6 +29,16 @@ function setupSockets(io, state, JWT_SECRET) {
 
     io.use((socket, next) => {
         const token = socket.handshake.auth.token;
+        
+        // --- SYSTÈME DE BOTS ---
+        // Si pas de token, on vérifie si c'est un bot (via un header ou query par exemple)
+        // Pour faire simple, on va regarder s'il y a une info "isBot" dans l'auth
+        if (!token && socket.handshake.auth.isBot) {
+            socket.username = `bot_${socket.handshake.auth.botId}`;
+            socket.isBot = true;
+            return next();
+        }
+
         if (!token) return next(new Error("Accès refusé. Token manquant."));
 
         jwt.verify(token, JWT_SECRET, (err, decoded) => {
@@ -54,6 +64,17 @@ function setupSockets(io, state, JWT_SECRET) {
 
     io.on('connection', (socket) => {
         const username = socket.username;
+
+        // Si c'est un bot, on l'initialise s'il n'existe pas encore
+        if (socket.isBot && !state.users[username]) {
+            state.users[username] = {
+                energy: 100,
+                team: socket.handshake.auth.team || 'red',
+                pixelsPlaced: 0,
+                isAdmin: 0
+            };
+            console.log(`🤖 Initialisation du profil pour ${username}`);
+        }
 
         if (!state.users[username]) {
             console.log(`⌛ Rejet de ${username} (non trouvé en base)`);

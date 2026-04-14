@@ -16,10 +16,18 @@ for (let i = 0; i < NUM_BOTS; i++) {
   // Étaler les connexions
   setTimeout(() => {
     // Note: On utilise l'URL interne via Docker-Compose si possible
+    const faction = FACTIONS[Math.floor(Math.random() * FACTIONS.length)];
+    const color = COLORS[faction];
+
     const socket = io(SERVER_URL, {
         reconnectionDelayMax: 10000,
         rejectUnauthorized: false,
-        transports: ['websocket']
+        transports: ['websocket'],
+        auth: {
+            isBot: true,
+            botId: i,
+            team: faction
+        }
     });
 
     socket.on('connect_error', (err) => {
