@@ -115,6 +115,13 @@ function App() {
     if (socket) socket.disconnect();
   };
 
+  const handleResetGrid = () => {
+    if (!isAdmin || !socket) return;
+    if (window.confirm("⚠️ Êtes-vous sûr de vouloir RÉINITIALISER TOUTE LA GRILLE ? Cette action est irréversible !")) {
+      socket.emit('admin-reset-grid');
+    }
+  };
+
   // --- SOCKET CONNECTION ---
   useEffect(() => {
     if (!token) return;
@@ -440,13 +447,22 @@ function App() {
 
           {/* ESPACE ADMIN LOGS */}
           {isAdmin && (
-            <div className="mt-4 bg-[#111] p-3 rounded border border-red-500 shadow-[0_0_10px_rgba(255,0,0,0.3)]">
-              <p className="text-red-500 mb-2 font-bold text-xs text-center">--- ADMIN LOGS ---</p>
-              <div className="space-y-1 h-32 overflow-y-auto text-[10px] text-gray-300 font-mono">
-                {adminLogs.length === 0 ? <span className="opacity-50">Aucun log en cours...</span> : null}
-                {adminLogs.map((log, i) => (
-                  <div key={i} className="border-b border-gray-800 pb-1">{log}</div>
-                ))}
+            <div className="mt-4 flex flex-col gap-2">
+              <button 
+                onClick={handleResetGrid}
+                className="w-full bg-[#ff0000] text-white py-2 rounded font-bold hover:bg-[#cc0000] transition-colors border-2 border-white/20 shadow-[0_0_10px_rgba(255,0,0,0.5)] cursor-pointer text-xs"
+              >
+                🚨 RÉINITIALISER LA GRILLE
+              </button>
+              
+              <div className="bg-[#111] p-3 rounded border border-red-500 shadow-[0_0_10px_rgba(255,0,0,0.3)]">
+                <p className="text-red-500 mb-2 font-bold text-xs text-center">--- ADMIN LOGS ---</p>
+                <div className="space-y-1 h-32 overflow-y-auto text-[10px] text-gray-300 font-mono">
+                  {adminLogs.length === 0 ? <span className="opacity-50">Aucun log en cours...</span> : null}
+                  {adminLogs.map((log, i) => (
+                    <div key={i} className="border-b border-gray-800 pb-1">{log}</div>
+                  ))}
+                </div>
               </div>
             </div>
           )}

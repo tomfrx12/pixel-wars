@@ -79,6 +79,21 @@ function setupSockets(io, state, JWT_SECRET) {
             sendAdminLog(`🔄 CHANGEMENT EQUIPE : ${username} -> ${newTeam}`);
         });
 
+        socket.on('admin-reset-grid', () => {
+            if (user.isAdmin !== 1) return;
+            
+            // Réinitialisation de l'état
+            state.pixels = {};
+            state.scores = { red: 0, blue: 0, green: 0, yellow: 0 };
+            
+            // Notification à tous les clients
+            io.emit('init-grid', {});
+            io.emit('update-scores', state.scores);
+            
+            console.log(`🚨 [${username}] a RÉINITIALISÉ la grille !`);
+            sendAdminLog(`🚨 RESET GRILLE : ${username} a tout effacé !`);
+        });
+
         socket.on('place-pixel', ({ x, y, color, faction, isBomb, isNuke }) => {
             const isAdmin = user.isAdmin === 1;
             const userFaction = isAdmin ? faction : (user.team || faction);
