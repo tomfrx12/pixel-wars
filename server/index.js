@@ -140,7 +140,7 @@ app.post('/api/register', async (req, res) => {
     const validation = authSchema.safeParse(req.body);
     if (!validation.success) {
         // Sécurise la lecture de l'erreur générée par Zod pour ne jamais crasher
-        const errMsg = validation.error?.errors?.[0]?.message || "Format de données invalide";
+        const errMsg = validation.error?.errors?.[0]?.message || JSON.stringify(validation.error) || "Format de données invalide";
         return res.status(400).json({ error: errMsg });
     }
 
