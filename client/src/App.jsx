@@ -290,7 +290,7 @@ function App() {
         </div>
 
         {/* Colonne de droite: Les Contrôles UI */}
-        <div className="flex flex-col w-[300px]">
+        <div className="flex flex-col w-[600px]">
           
           {/* Barre d'énergie */}
           <div className="mb-6 text-center">
