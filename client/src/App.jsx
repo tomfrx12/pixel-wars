@@ -3,8 +3,8 @@ import { io } from 'socket.io-client';
 
 const SERVER_URL = ''; // Utilise le proxy Vite configuré pour rediriger vers localhost:3001
 
-const GRID_SIZE = 200;
-const PIXEL_SIZE = 4; // Taille réduite pour une carte de 200x200
+const GRID_SIZE = 500;
+const PIXEL_SIZE = 4; // Garde la taille de pixel mais la map sera x2.5 plus grande !
 
 // --- SYSTEME AUDIO OPTIMISÉ (SINGLETON) ---
 let audioCtx = null;
@@ -210,9 +210,9 @@ function App() {
         // Optionnel: on pourrait dessiner une grille ici si besoin
       }
 
-      // Bordure de la carte
-      ctx.strokeStyle = '#00ff00';
-      ctx.lineWidth = 2 / zoom;
+      // Bordure de la carte (Três fine et discrète en noir)
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)'; // Noir semi-transparent
+      ctx.lineWidth = 1 / zoom; // Toujours 1px écran peu importe le zoom
       ctx.strokeRect(0, 0, GRID_SIZE * PIXEL_SIZE, GRID_SIZE * PIXEL_SIZE);
 
       ctx.restore();

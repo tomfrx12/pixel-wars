@@ -15,7 +15,7 @@ const state = {
     pixels: {},
     users: {},
     scores: { red: 0, blue: 0, green: 0, yellow: 0 },
-    GRID_SIZE: 200,
+    GRID_SIZE: 500, // Passée de 200 à 500 (250 000 pixels)
     db: null
 };
 
