@@ -219,16 +219,18 @@ function App() {
     };
 
     // On redessine quand le zoom ou l'offset change
-    drawGrid();
+    requestAnimationFrame(drawGrid);
 
     socket.on('init-grid', (pixels) => {
       gridStateRef.current = pixels;
       updateOffscreen();
-      drawGrid();
+      requestAnimationFrame(drawGrid);
     });
 
     socket.on('update-pixel', (pixel) => {
       const { x, y, color, faction, username: pUsername, isBomb, isNuke } = pixel;
+      
+      // Mise à jour immédiate de l'état local pour une réactivité maximale
       gridStateRef.current[`${x}-${y}`] = { color, faction, username: pUsername };
       
       // Mise à jour incrémentale du cache
@@ -238,10 +240,9 @@ function App() {
         oCtx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
       }
       
-      drawGrid();
+      requestAnimationFrame(drawGrid);
 
       // --- FILTRE SONORE STRICT ---
-      // On ne joue le son QUE si le pseudo qui a posé le pixel est LE NOTRE
       if (pUsername === localStorage.getItem('username')) {
         if (isNuke) {
           playSound('nuke');
@@ -253,24 +254,21 @@ function App() {
           playSound('pixel');
         }
       }
-      // Si ce n'est pas nous, on ne joue ABSOLUMENT RIEN (ni pixel, ni bombe, ni nuke)
     });
 
     socket.on('update-pixel-batch', ({ pixels, isNuke, isBomb, username: batchUser }) => {
-      const oCtx = offscreenCanvasRef.current ? offscreenCanvasRef.current.getContext('2d') : null;
+      if (!offscreenCanvasRef.current) updateOffscreen();
+      const oCtx = offscreenCanvasRef.current.getContext('2d');
       
       pixels.forEach(({ x, y, color, faction, username }) => {
         gridStateRef.current[`${x}-${y}`] = { color, faction, username };
-        if (oCtx) {
-          oCtx.fillStyle = color;
-          oCtx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
-        }
+        oCtx.fillStyle = color;
+        oCtx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
       });
       
-      drawGrid();
+      requestAnimationFrame(drawGrid);
 
       // --- FILTRE SONORE BATCH STRICT ---
-      // On vérifie si c'est nous qui avons lancé le batch (Bombe/Nuke)
       if (batchUser === localStorage.getItem('username')) {
         if (isNuke) {
           playSound('nuke');

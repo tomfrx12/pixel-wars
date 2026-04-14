@@ -151,7 +151,7 @@ function setupSockets(io, state, JWT_SECRET) {
 
         socket.on('place-pixel', ({ x, y, color, faction, isBomb, isNuke }) => {
             const isAdmin = user.isAdmin === 1;
-            const userFaction = isAdmin ? faction : (user.team || faction);
+            const userFaction = isAdmin ? (faction || user.team) : (user.team || faction);
             let cost = 5;
             if (isNuke) cost = 100;
             else if (isBomb) cost = 20;
@@ -160,6 +160,9 @@ function setupSockets(io, state, JWT_SECRET) {
                 socket.emit('error-msg', `Pas assez d'énergie ! (${cost})`);
                 return;
             }
+
+            // OPTIMISATION : Réponse immédiate pour le client qui a cliqué
+            socket.emit('energy-update', user.energy - cost);
 
             const FACTION_COLORS = { red: '#ff4444', blue: '#4444ff', green: '#44ff44', yellow: '#ffff44' };
             const activeColor = FACTION_COLORS[userFaction] || color;
