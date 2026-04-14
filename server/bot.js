@@ -48,16 +48,29 @@ for (let i = 0; i < NUM_BOTS; i++) {
 
     // Dès qu'on reçoit de l'énergie, on décide de jouer
     socket.on('energy-update', (energy) => {
+      // 1. Tenter un NUKE (Cout: 100)
       if (energy >= 100) {
-        // 20% de chance d'envoyer une BOMBE quand l'énergie est pleine
-        if (Math.random() > 0.8) {
+        if (Math.random() > 0.9) { // 10% de chance d'envoyer un NUKE quand l'énergie est au max
+          const x = Math.floor(Math.random() * 200);
+          const y = Math.floor(Math.random() * 200);
+          socket.emit('place-pixel', { x, y, color, faction, isNuke: true });
+          return;
+        }
+      }
+
+      // 2. Tenter une BOMBE (Cout: 25)
+      if (energy >= 25) {
+        if (Math.random() > 0.8) { // 20% de chance d'envoyer une BOMBE
           const x = Math.floor(Math.random() * 200);
           const y = Math.floor(Math.random() * 200);
           socket.emit('place-pixel', { x, y, color, faction, isBomb: true });
+          return;
         }
-      } else if (energy >= 10) {
-        // Sinon, si on a un peu d'énergie, 30% de chance de poser un PIXEL
-        if (Math.random() > 0.7) {
+      }
+
+      // 3. Tenter un PIXEL SIMPLE (Cout: 10)
+      if (energy >= 10) {
+        if (Math.random() > 0.7) { // 30% de chance de poser un PIXEL
           const x = Math.floor(Math.random() * 200);
           const y = Math.floor(Math.random() * 200);
           socket.emit('place-pixel', { x, y, color, faction, isBomb: false });
