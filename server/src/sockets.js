@@ -152,7 +152,20 @@ function setupSockets(io, state, JWT_SECRET) {
                     for (let dy = -3; dy <= 3; dy++) {
                         const ny = y + dy;
                         if (ny < 0 || ny >= state.GRID_SIZE) continue;
-                        if (Math.abs(dx) + Math.abs(dy) <= 4) pixelsToUpdate.push({ px: nx, py: ny });
+                        
+                        const distance = Math.abs(dx) + Math.abs(dy);
+                        // Cœur (dist 0-1) : 100%
+                        if (distance <= 1) {
+                            pixelsToUpdate.push({ px: nx, py: ny });
+                        } 
+                        // Milieu (dist 2) : 70%
+                        else if (distance === 2 && Math.random() < 0.7) {
+                            pixelsToUpdate.push({ px: nx, py: ny });
+                        }
+                        // Bord (dist 3-4) : 30%
+                        else if (distance > 2 && distance <= 4 && Math.random() < 0.3) {
+                            pixelsToUpdate.push({ px: nx, py: ny });
+                        }
                     }
                 }
             } else {

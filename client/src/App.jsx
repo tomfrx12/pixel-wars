@@ -6,47 +6,51 @@ const SERVER_URL = ''; // Utilise le proxy Vite configuré pour rediriger vers l
 const GRID_SIZE = 200;
 const PIXEL_SIZE = 4; // Taille réduite pour une carte de 200x200
 
+// --- SYSTEME AUDIO OPTIMISÉ (SINGLETON) ---
+let audioCtx = null;
 const playSound = (type) => {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  
+  // Reprendre le contexte si le navigateur l'a suspendu
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
 
   osc.connect(gain);
-  gain.connect(ctx.destination);
+  gain.connect(audioCtx.destination);
 
-  const now = ctx.currentTime;
+  const now = audioCtx.currentTime;
 
   if (type === 'pixel') {
-    // Petit "blip" aigu pour le pixel
     osc.type = 'sine';
     osc.frequency.setValueAtTime(800, now);
-    osc.frequency.exponentialRampToValueAtTime(400, now + 0.1);
-    gain.gain.setValueAtTime(0.1, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+    osc.frequency.exponentialRampToValueAtTime(400, now + 0.05);
+    gain.gain.setValueAtTime(0.05, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
     osc.start(now);
-    osc.stop(now + 0.1);
+    osc.stop(now + 0.05);
   } else if (type === 'bomb') {
-    // Explosion sourde pour la bombe
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(150, now);
-    osc.frequency.exponentialRampToValueAtTime(40, now + 0.4);
-    gain.gain.setValueAtTime(0.2, now);
-    gain.gain.linearRampToValueAtTime(0, now + 0.4);
+    osc.frequency.exponentialRampToValueAtTime(40, now + 0.2);
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.linearRampToValueAtTime(0, now + 0.2);
     osc.start(now);
-    osc.stop(now + 0.4);
+    osc.stop(now + 0.2);
   } else if (type === 'nuke') {
-    // Énorme impact avec montée de fréquence et bruit blanc simulé
     osc.type = 'square';
     osc.frequency.setValueAtTime(300, now);
-    osc.frequency.exponentialRampToValueAtTime(30, now + 1.2);
-    
-    // Gain qui monte puis descend doucement
+    osc.frequency.exponentialRampToValueAtTime(30, now + 0.8);
     gain.gain.setValueAtTime(0.01, now);
-    gain.gain.exponentialRampToValueAtTime(0.4, now + 0.1);
-    gain.gain.linearRampToValueAtTime(0, now + 1.5);
-    
+    gain.gain.exponentialRampToValueAtTime(0.2, now + 0.05);
+    gain.gain.linearRampToValueAtTime(0, now + 0.8);
     osc.start(now);
-    osc.stop(now + 1.5);
+    osc.stop(now + 0.8);
   }
 };
 
@@ -260,7 +264,7 @@ function App() {
       if (isNuke) {
         playSound('nuke');
         setIsNukeTriggered(true);
-        setTimeout(() => setIsNukeTriggered(false), 1500);
+        setTimeout(() => setIsNukeTriggered(false), 500); // Réduit à 500ms au lieu de 1500ms
       } else if (isBomb) {
         playSound('bomb');
       }
