@@ -51,15 +51,15 @@ for (let i = 0; i < NUM_BOTS; i++) {
       if (energy >= 100) {
         // 20% de chance d'envoyer une BOMBE quand l'énergie est pleine
         if (Math.random() > 0.8) {
-          const x = Math.floor(Math.random() * 100);
-          const y = Math.floor(Math.random() * 100);
+          const x = Math.floor(Math.random() * 200);
+          const y = Math.floor(Math.random() * 200);
           socket.emit('place-pixel', { x, y, color, faction, isBomb: true });
         }
       } else if (energy >= 10) {
         // Sinon, si on a un peu d'énergie, 30% de chance de poser un PIXEL
         if (Math.random() > 0.7) {
-          const x = Math.floor(Math.random() * 100);
-          const y = Math.floor(Math.random() * 100);
+          const x = Math.floor(Math.random() * 200);
+          const y = Math.floor(Math.random() * 200);
           socket.emit('place-pixel', { x, y, color, faction, isBomb: false });
         }
       }
