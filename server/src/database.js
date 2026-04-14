@@ -3,7 +3,8 @@ const path = require('path');
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..');
+// Le dossier de données par défaut est /app/data pour Docker, sinon le dossier parent du serveur
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
 }

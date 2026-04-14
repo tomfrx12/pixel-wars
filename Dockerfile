@@ -29,6 +29,10 @@ RUN npm rebuild sqlite3 --build-from-source
 # On récupère le frontend compilé depuis l'étape 1 !
 COPY --from=build /app/client/dist /app/client/dist
 
+# Création du dossier pour les données persistantes
+RUN mkdir -p /app/data
+ENV DATA_DIR=/app/data
+
 # Port sur lequel le backend Node écoute (celui qu'on a configuré dans index.js)
 EXPOSE 80
 
