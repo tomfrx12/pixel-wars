@@ -6,6 +6,50 @@ const SERVER_URL = ''; // Utilise le proxy Vite configuré pour rediriger vers l
 const GRID_SIZE = 50;
 const PIXEL_SIZE = 15; // Taille d'un pixel à l'écran
 
+const playSound = (type) => {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  const now = ctx.currentTime;
+
+  if (type === 'pixel') {
+    // Petit "blip" aigu pour le pixel
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800, now);
+    osc.frequency.exponentialRampToValueAtTime(400, now + 0.1);
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  } else if (type === 'bomb') {
+    // Explosion sourde pour la bombe
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, now);
+    osc.frequency.exponentialRampToValueAtTime(40, now + 0.4);
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.linearRampToValueAtTime(0, now + 0.4);
+    osc.start(now);
+    osc.stop(now + 0.4);
+  } else if (type === 'nuke') {
+    // Énorme impact avec montée de fréquence et bruit blanc simulé
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(300, now);
+    osc.frequency.exponentialRampToValueAtTime(30, now + 1.2);
+    
+    // Gain qui monte puis descend doucement
+    gain.gain.setValueAtTime(0.01, now);
+    gain.gain.exponentialRampToValueAtTime(0.4, now + 0.1);
+    gain.gain.linearRampToValueAtTime(0, now + 1.5);
+    
+    osc.start(now);
+    osc.stop(now + 1.5);
+  }
+};
+
 const FACTION_COLORS = {
   red: '#ff0000',
   blue: '#0044ff',
@@ -167,8 +211,13 @@ function App() {
     if (isNukeMode) {
       if (energy >= 100 || isAdmin) {
         setIsNukeTriggered(true);
+        playSound('nuke');
         setTimeout(() => setIsNukeTriggered(false), 300); // 300ms de flash blanc
       }
+    } else if (isBombMode) {
+      if (energy >= 40 || isAdmin) playSound('bomb');
+    } else {
+      if (energy >= 5 || isAdmin) playSound('pixel');
     }
 
     socket.emit('place-pixel', { 
