@@ -70,6 +70,7 @@ function App() {
   const [hoverPixel, setHoverPixel] = useState(null); // { x, y, faction, username }
   const [adminLogs, setAdminLogs] = useState([]);
   const [adminUsers, setAdminUsers] = useState([]); // Liste des connectés pour l'admin
+  const [openTeams, setOpenTeams] = useState({ red: true, blue: true, green: true, yellow: true }); // État des accordéons
   const [totalPlayers, setTotalPlayers] = useState(0); // Nouveau compteur global
   const [energy, setEnergy] = useState(100);
   const [myTeam, setMyTeam] = useState('red');
@@ -625,23 +626,51 @@ function App() {
           {isAdmin && (
             <div className="mt-4 flex flex-col gap-3">
               <div className="bg-[#111] p-3 rounded border border-[#00ff00] shadow-[0_0_15px_rgba(0,255,0,0.2)]">
-                <p className="text-[#00ff00] mb-2 font-bold text-xs text-center uppercase tracking-widest">--- JOUEURS CONNECTÉS ({adminUsers.length}) ---</p>
-                <div className="space-y-1 h-32 overflow-y-auto text-[10px] font-mono">
-                  {adminUsers.length === 0 ? <span className="text-gray-500 opacity-50 italic">Aucun utilisateur...</span> : null}
-                  {adminUsers.map((u, i) => (
-                    <div key={i} className="flex justify-between items-center bg-[#1a1a1a] p-1.5 rounded border border-gray-800 mb-1 hover:border-gray-600 transition-colors">
-                      <div className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: FACTION_COLORS[u.team] || '#fff' }}></div>
-                        <span className={u.isBot ? 'text-blue-400 italic' : 'text-white'}>
-                          {u.username} {u.isAdmin && '👑'} {u.isBot && '(bot)'}
-                        </span>
+                <p className="text-[#00ff00] mb-3 font-bold text-xs text-center uppercase tracking-widest">--- JOUEURS CONNECTÉS ---</p>
+                
+                <div className="space-y-2 h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+                  {['red', 'blue', 'green', 'yellow'].map(teamId => {
+                    const teamUsers = adminUsers.filter(u => u.team === teamId);
+                    const isOpen = openTeams[teamId];
+                    
+                    return (
+                      <div key={teamId} className="border border-gray-800 rounded overflow-hidden">
+                        {/* Header Accordéon */}
+                        <button 
+                          onClick={() => setOpenTeams(prev => ({ ...prev, [teamId]: !prev[teamId] }))}
+                          className="w-full flex justify-between items-center p-2 bg-[#1a1a1a] hover:bg-[#222] transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: FACTION_COLORS[teamId] }}></div>
+                            <span className="text-[10px] font-bold uppercase" style={{ color: FACTION_COLORS[teamId] }}>
+                              TEAM {teamId} ({teamUsers.length})
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-gray-500">{isOpen ? '▼' : '▶'}</span>
+                        </button>
+
+                        {/* Contenu Accordéon */}
+                        {isOpen && (
+                          <div className="p-1 bg-black/30 space-y-1">
+                            {teamUsers.length === 0 ? (
+                              <div className="text-[9px] text-gray-600 italic p-1">Aucun joueur...</div>
+                            ) : (
+                              teamUsers.map((u, i) => (
+                                <div key={i} className="flex justify-between items-center p-1.5 rounded bg-[#151515] border border-gray-900/50">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-[10px] ${u.isBot ? 'text-blue-400 italic' : 'text-white'}`}>
+                                      {u.username} {u.isAdmin && '👑'}
+                                    </span>
+                                  </div>
+                                  <span className="text-[9px] text-gray-500">⚡{u.energy}%</span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex gap-3 text-gray-500">
-                        <span>⚡ {u.energy}%</span>
-                        <span className="uppercase text-[8px] opacity-70">[{u.team}]</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
