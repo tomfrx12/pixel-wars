@@ -65,9 +65,10 @@ function App() {
   const canvasRef = useRef(null);
   const offscreenCanvasRef = useRef(null); // Canvas en mémoire
   const gridStateRef = useRef({}); // Stockera la faction et le username pour le survol
+  
+  const hoverInfoRef = useRef(null); // DOM ref pour optimiser les performances au survol de la souris
 
   // --- GAME STATE ---
-  const [hoverPixel, setHoverPixel] = useState(null); // { x, y, faction, username }
   const [adminLogs, setAdminLogs] = useState([]);
   const [adminUsers, setAdminUsers] = useState([]); // Liste des connectés pour l'admin
   const [openTeams, setOpenTeams] = useState({ red: true, blue: true, green: true, yellow: true }); // État des accordéons
@@ -415,10 +416,12 @@ function App() {
     const key = `${x}-${y}`;
     const info = gridStateRef.current[key];
     
-    if (info && info.username) {
-      setHoverPixel({ x, y, ...info });
-    } else {
-      setHoverPixel(null);
+    if (hoverInfoRef.current) {
+      if (info && info.username) {
+        hoverInfoRef.current.innerHTML = `<span>Faction <span style="color: ${info.color}">${info.faction}</span>, par : ${info.username}</span>`;
+      } else {
+        hoverInfoRef.current.innerHTML = "Survolez la grille...";
+      }
     }
   };
 
@@ -524,15 +527,19 @@ function App() {
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onClick={handleCanvasClick}
-            onMouseLeave={() => { setHoverPixel(null); setIsDragging(false); }}
+            onMouseLeave={() => { 
+                if (hoverInfoRef.current) hoverInfoRef.current.innerHTML = "Survolez la grille...";
+                setIsDragging(false); 
+            }}
             className={`border-[3px] border-[#333] shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-white cursor-crosshair [image-rendering:pixelated] transition-all ${isNukeTriggered ? 'border-white shadow-[0_0_50px_#fff]' : ''}`}
             style={{ width: '800px', height: '800px' }} // Taille fixe pour l'affichage, le zoom gère l'intérieur
           />
           {/* Panneau d'informations du pixel survolé (Visible pour tous) */}
-          <div className="h-8 mt-2 text-sm text-[#00ff00] font-bold flex items-center justify-center">
-            {hoverPixel ? (
-              <span>Faction <span style={{color: hoverPixel.color}}>{hoverPixel.faction}</span>, par : {hoverPixel.username}</span>
-            ) : "Survolez la grille..."}
+          <div 
+            ref={hoverInfoRef}
+            className="h-8 mt-2 text-sm text-[#00ff00] font-bold flex items-center justify-center"
+          >
+            Survolez la grille...
           </div>
         </div>
 

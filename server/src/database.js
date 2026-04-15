@@ -61,16 +61,26 @@ async function initDB() {
     });
     console.log(`🗄️ ${rows.length} utilisateurs chargés !`);
 
-    setInterval(() => {
+    setInterval(async () => {
         fs.writeFile(DATA_FILE, JSON.stringify({ pixels: state.pixels, scores: state.scores }), () => {});
         if (state.db) {
-            Object.keys(state.users).forEach(async (username) => {
-                const u = state.users[username];
-                await state.db.run(
-                    "UPDATE users SET energy = ?, team = ?, pixelsPlaced = ?, isAdmin = ? WHERE username = ?",
-                    [u.energy, u.team || '', u.pixelsPlaced || 0, u.isAdmin || 0, username]
-                );
-            });
+            const dirtyUsers = Object.entries(state.users).filter(([_, u]) => u.dirty);
+            if (dirtyUsers.length === 0) return;
+
+            try {
+                await state.db.exec("BEGIN TRANSACTION");
+                for (const [username, u] of dirtyUsers) {
+                    await state.db.run(
+                        "UPDATE users SET energy = ?, team = ?, pixelsPlaced = ?, isAdmin = ? WHERE username = ?",
+                        [u.energy, u.team || '', u.pixelsPlaced || 0, u.isAdmin || 0, username]
+                    );
+                    u.dirty = false;
+                }
+                await state.db.exec("COMMIT");
+            } catch (e) {
+                await state.db.exec("ROLLBACK");
+                console.error("Erreur sauvegarde db:", e);
+            }
         }
     }, 5000);
 }

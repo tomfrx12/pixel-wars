@@ -1,13 +1,10 @@
 const jwt = require('jsonwebtoken');
 
 function setupSockets(io, state, JWT_SECRET) {
-    setInterval(() => {
-        io.emit('update-scores', state.scores);
-        
-        // --- COMPTEUR DE JOUEURS GLOBAL ---
+    function broadcastPlayerCount() {
         const totalConnected = io.sockets.sockets.size; // Nombre brut de sockets
         io.emit('total-players-update', totalConnected);
-    }, 1000);
+    }
 
     function getGridColors() {
         const out = {};
@@ -83,14 +80,18 @@ function setupSockets(io, state, JWT_SECRET) {
     });
 
     setInterval(() => {
+        const updatedUsers = new Set();
         Object.keys(state.users).forEach(username => {
-            if (state.users[username].energy < 100) {
-                state.users[username].energy += 2;
-                if (state.users[username].energy > 100) state.users[username].energy = 100;
+            const u = state.users[username];
+            if (u.energy < 100) {
+                u.energy += 2;
+                if (u.energy > 100) u.energy = 100;
+                u.dirty = true;
+                updatedUsers.add(username);
             }
         });
         io.sockets.sockets.forEach(socket => {
-            if (socket.username && state.users[socket.username]) {
+            if (socket.username && updatedUsers.has(socket.username)) {
                 socket.emit('energy-update', state.users[socket.username].energy);
             }
         });
@@ -119,16 +120,19 @@ function setupSockets(io, state, JWT_SECRET) {
 
         console.log(`✅ ${username} s'est connecté.`);
         sendAdminLog(`🟢 CONNEXION : ${username}`);
+        broadcastPlayerCount();
         const user = state.users[username];
 
         socket.emit('energy-update', user.energy);
         socket.emit('stats-update', { team: user.team, pixelsPlaced: user.pixelsPlaced, isAdmin: user.isAdmin === 1 });
         socket.emit('init-grid', getGridColors());
         socket.emit('update-scores', state.scores);
+        socket.emit('total-players-update', io.sockets.sockets.size);
 
         socket.on('change-team', (newTeam) => {
             if (user.isAdmin !== 1) return;
             user.team = newTeam;
+            user.dirty = true;
             socket.emit('stats-update', { team: user.team, pixelsPlaced: user.pixelsPlaced, isAdmin: true });
             console.log(`👑 [${username}] a changé pour : ${newTeam}`);
             sendAdminLog(`🔄 CHANGEMENT EQUIPE : ${username} -> ${newTeam}`);
@@ -229,11 +233,14 @@ function setupSockets(io, state, JWT_SECRET) {
 
             if (batch.length > 1) {
                 io.emit('update-pixel-batch', { pixels: batch, isNuke, isBomb, username: username });
+                io.emit('update-scores', state.scores);
             } else if (batch.length === 1) {
                 io.emit('update-pixel', { ...batch[0], isNuke: false, isBomb: false, username: username });
+                io.emit('update-scores', state.scores);
             }
 
             if (!isAdmin) user.energy -= cost;
+            user.dirty = true;
 
             socket.emit('energy-update', user.energy);
             socket.emit('stats-update', { team: user.team, pixelsPlaced: user.pixelsPlaced, isAdmin: user.isAdmin === 1 });
@@ -248,6 +255,7 @@ function setupSockets(io, state, JWT_SECRET) {
         socket.on('disconnect', () => {
             console.log(`❌ ${username} s'est déconnecté.`);
             sendAdminLog(`🔴 DECONNEXION : ${username}`);
+            broadcastPlayerCount();
         });
     });
 }
