@@ -1,3 +1,4 @@
+require('dotenv').config({ path: '../.env' });
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -29,12 +30,12 @@ const io = new Server(server, { cors: { origin: "*" } });
         });
 
         app.use((err, req, res, next) => {
-            console.error('? Erreur serveur attrapée :', err);
+            console.error('? Erreur serveur attrapï¿½e :', err);
             res.status(500).json({ error: "Erreur serveur : " + (err.message || "") });
         });
 
         const PORT = process.env.PORT || 80;
-        server.listen(PORT, () => console.log('?? Serveur Pixel Wars prêt sur le port ' + PORT));
+        server.listen(PORT, () => console.log('?? Serveur Pixel Wars prï¿½t sur le port ' + PORT));
     } catch (e) {
         console.error('FATAL ERROR:', e);
     }
