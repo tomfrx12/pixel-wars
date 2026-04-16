@@ -4,12 +4,11 @@ const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 
 // Le dossier de données par défaut est /app/data pour Docker, sinon le dossier parent du serveur
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!fs.existsSync(process.env.DATA_DIR)) {
+    fs.mkdirSync(process.env.DATA_DIR, { recursive: true });
 }
 
-const DATA_FILE = path.join(DATA_DIR, 'grid.json');
+const DATA_FILE = path.join(process.env.DATA_DIR, 'grid.json');
 
 const state = {
     pixels: {},
@@ -32,7 +31,7 @@ async function initDB() {
     }
 
     state.db = await open({
-        filename: path.join(DATA_DIR, 'users.db'),
+        filename: path.join(process.env.DATA_DIR, 'users.db'),
         driver: sqlite3.Database
     });
 
