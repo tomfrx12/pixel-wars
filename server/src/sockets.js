@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 
-function setupSockets(io, state, JWT_SECRET) {
+function setupSockets(io, state, config) {
     function broadcastPlayerCount() {
         const totalConnected = io.sockets.sockets.size; // Nombre brut de sockets
         io.emit('total-players-update', totalConnected);
@@ -62,7 +62,7 @@ function setupSockets(io, state, JWT_SECRET) {
 
         if (!token) return next(new Error("Accès refusé. Token manquant."));
 
-        jwt.verify(token, JWT_SECRET, (err, decoded) => {
+        jwt.verify(token, config.JWT_SECRET, (err, decoded) => {
             if (err) return next(new Error("Accès refusé. Token invalide."));
             
             // Sécurité supplémentaire : Vérifier si l'utilisateur existe encore en base
@@ -96,7 +96,6 @@ function setupSockets(io, state, JWT_SECRET) {
     io.on('connection', (socket) => {
         const username = socket.username;
         let lastActionTime = 0;
-        const ACTION_COOLDOWN = 100; // 100ms entre chaque action pour éviter le spam par bot/script
 
         if (!state.users[username]) {
             console.log(`⌛ Rejet de ${username} (non trouvé en base)`);
@@ -142,7 +141,7 @@ function setupSockets(io, state, JWT_SECRET) {
 
         socket.on('place-pixel', ({ x, y, color, faction, isBomb, isNuke }) => {
             const now = Date.now();
-            if (now - lastActionTime < ACTION_COOLDOWN) return; // Anti-spam
+            if (now - lastActionTime < config.ACTION_COOLDOWN) return; // Anti-spam
             lastActionTime = now;
 
             const isAdmin = user.isAdmin === 1;

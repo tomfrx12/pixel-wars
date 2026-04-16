@@ -45,7 +45,12 @@ const io = new Server(server, {
     try {
         await initDB();
         setupAuth(app, state, process.env.JWT_SECRET);
-        setupSockets(io, state, process.env.JWT_SECRET);
+        
+        const socketConfig = {
+            JWT_SECRET: process.env.JWT_SECRET,
+            ACTION_COOLDOWN: parseInt(process.env.ACTION_COOLDOWN)
+        };
+        setupSockets(io, state, socketConfig);
 
         app.use(express.static(path.join(__dirname, '../client/dist')));
         app.get(/(.*)/, (req, res) => {
