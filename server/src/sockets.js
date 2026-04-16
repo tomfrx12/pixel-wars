@@ -250,7 +250,7 @@ function setupSockets(io, state, JWT_SECRET) {
             else if (isBomb) actionType = '💣 BOMBE';
             
             console.log(`🎮 [${username}] ${actionType} : Faction ${userFaction}`);
-            sendAdminLog(`${actionType} : ${username} en (${x}, ${y}) pour la faction ${userFaction}`);
+            sendAdminLog(`${actionType} : ${username} (${userFaction})`);
         });
 
         socket.on('disconnect', () => {
