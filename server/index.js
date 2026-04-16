@@ -1,4 +1,4 @@
-require('dotenv').config({ path: '../.env' });
+require('dotenv').config({ path: '../env' });
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -25,8 +25,8 @@ app.use(helmet({
 
 // Limitation du débit (Rate Limiting) pour éviter le brute force et le spam API
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limite chaque IP à 100 requêtes par windowMs
+    windowMs: 30 * 60 * 1000, // 30 minutes
+    max: 25, // Limite chaque IP à 25 requêtes par windowMs
     standardHeaders: true,
     legacyHeaders: false,
 });
