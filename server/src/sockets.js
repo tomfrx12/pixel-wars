@@ -124,12 +124,19 @@ function setupSockets(io, state, config) {
             sendAdminLog(`🔄 CHANGEMENT EQUIPE : ${username} -> ${newTeam}`);
         });
 
-        socket.on('admin-reset-grid', () => {
+        socket.on('admin-reset-grid', async () => {
             if (user.isAdmin !== 1) return;
             
             // Réinitialisation de l'état
             state.pixels = {};
             state.scores = { red: 0, blue: 0, green: 0, yellow: 0 };
+            
+            // Vidage de la table pixels en base
+            try {
+                await state.db.run("DELETE FROM pixels");
+            } catch (e) {
+                console.error("Erreur lors du reset de la grille en DB:", e);
+            }
             
             // Notification à tous les clients
             io.emit('init-grid', {});
@@ -224,7 +231,7 @@ function setupSockets(io, state, config) {
                     if (state.scores[oldPixel.faction] > 0) state.scores[oldPixel.faction]--;
                 }
 
-                state.pixels[key] = { color: activeColor, faction: userFaction, username: username };
+                state.pixels[key] = { color: activeColor, faction: userFaction, username: username, dirty: true };
                 if (state.scores[userFaction] !== undefined) state.scores[userFaction]++;
                 
                 batch.push({ x: px, y: py, color: activeColor, faction: userFaction, username: username });

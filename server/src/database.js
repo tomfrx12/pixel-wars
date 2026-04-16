@@ -19,22 +19,12 @@ const state = {
 };
 
 async function initDB() {
-    if (fs.existsSync(DATA_FILE)) {
-        try {
-            const savedData = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
-            if (savedData.pixels) state.pixels = savedData.pixels;
-            if (savedData.scores) state.scores = savedData.scores;
-            console.log("💾 Données restaurées depuis grid.json");
-        } catch (e) {
-            console.error("Erreur lecture grid.json :", e);
-        }
-    }
-
     state.db = await open({
-        filename: path.join(process.env.DATA_DIR, 'users.db'),
+        filename: path.join(process.env.DATA_DIR, 'game.db'),
         driver: sqlite3.Database
     });
 
+    // Création des tables
     await state.db.exec(`
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
@@ -43,11 +33,31 @@ async function initDB() {
             team TEXT DEFAULT '',
             pixelsPlaced INTEGER DEFAULT 0,
             isAdmin INTEGER DEFAULT 0
-        )
+        );
+        CREATE TABLE IF NOT EXISTS pixels (
+            x INTEGER,
+            y INTEGER,
+            color TEXT,
+            faction TEXT,
+            username TEXT,
+            PRIMARY KEY (x, y)
+        );
     `);
 
-    try { await state.db.exec("ALTER TABLE users ADD COLUMN isAdmin INTEGER DEFAULT 0"); } catch (e) {}
+    // Suppression du vieux JSON si il existe encore
+    if (fs.existsSync(DATA_FILE)) {
+        try { fs.unlinkSync(DATA_FILE); } catch(e){}
+    }
 
+    // Chargement des pixels en mémoire
+    const pixels = await state.db.all("SELECT * FROM pixels");
+    pixels.forEach(p => {
+        state.pixels[`${p.x}-${p.y}`] = { color: p.color, faction: p.faction, username: p.username };
+        if (state.scores[p.faction] !== undefined) state.scores[p.faction]++;
+    });
+    console.log(`💾 ${pixels.length} pixels chargés depuis SQLite !`);
+
+    // Chargement des utilisateurs
     const rows = await state.db.all("SELECT * FROM users");
     rows.forEach(row => {
         state.users[row.username] = {
@@ -60,26 +70,39 @@ async function initDB() {
     });
     console.log(`🗄️ ${rows.length} utilisateurs chargés !`);
 
+    // Sauvegarde périodique (Batch)
     setInterval(async () => {
-        fs.writeFile(DATA_FILE, JSON.stringify({ pixels: state.pixels, scores: state.scores }), () => {});
-        if (state.db) {
-            const dirtyUsers = Object.entries(state.users).filter(([_, u]) => u.dirty);
-            if (dirtyUsers.length === 0) return;
+        if (!state.db) return;
 
-            try {
-                await state.db.exec("BEGIN TRANSACTION");
-                for (const [username, u] of dirtyUsers) {
-                    await state.db.run(
-                        "UPDATE users SET energy = ?, team = ?, pixelsPlaced = ?, isAdmin = ? WHERE username = ?",
-                        [u.energy, u.team || '', u.pixelsPlaced || 0, u.isAdmin || 0, username]
-                    );
-                    u.dirty = false;
-                }
-                await state.db.exec("COMMIT");
-            } catch (e) {
-                await state.db.exec("ROLLBACK");
-                console.error("Erreur sauvegarde db:", e);
+        const dirtyUsers = Object.entries(state.users).filter(([_, u]) => u.dirty);
+        const dirtyPixels = Object.entries(state.pixels).filter(([_, p]) => p.dirty);
+
+        if (dirtyUsers.length === 0 && dirtyPixels.length === 0) return;
+
+        try {
+            await state.db.exec("BEGIN TRANSACTION");
+            
+            for (const [username, u] of dirtyUsers) {
+                await state.db.run(
+                    "UPDATE users SET energy = ?, team = ?, pixelsPlaced = ?, isAdmin = ? WHERE username = ?",
+                    [u.energy, u.team || '', u.pixelsPlaced || 0, u.isAdmin || 0, username]
+                );
+                u.dirty = false;
             }
+
+            for (const [key, p] of dirtyPixels) {
+                const [px, py] = key.split('-').map(Number);
+                await state.db.run(
+                    "INSERT OR REPLACE INTO pixels (x, y, color, faction, username) VALUES (?, ?, ?, ?, ?)",
+                    [px, py, p.color, p.faction, p.username || '']
+                );
+                p.dirty = false;
+            }
+
+            await state.db.exec("COMMIT");
+        } catch (e) {
+            await state.db.exec("ROLLBACK");
+            console.error("Erreur sauvegarde db collective :", e);
         }
     }, 5000);
 }
