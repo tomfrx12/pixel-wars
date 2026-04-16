@@ -25,8 +25,8 @@ app.use(helmet({
 
 // Limitation du débit (Rate Limiting) pour éviter le brute force et le spam API
 const limiter = rateLimit({
-    windowMs: 30 * 60 * 1000, // 30 minutes
-    max: 25, // Limite chaque IP à 25 requêtes par windowMs
+    windowMs: 5 * 60 * 1000, // 30 minutes
+    max: 20, // Limite chaque IP à 25 requêtes par windowMs
     standardHeaders: true,
     legacyHeaders: false,
 });
@@ -53,14 +53,14 @@ const io = new Server(server, {
         });
 
         app.use((err, req, res, next) => {
-            console.error('? Erreur serveur attrap�e :', err);
+            console.error('? Erreur serveur attrapée :', err);
             res.status(500).json({ error: "Erreur serveur : " + (err.message || "") });
         });
 
         if (!process.env.PORT) {
             throw new Error("PORT est requis. Définis-le dans ton fichier .env");
         }
-        server.listen(process.env.PORT, () => console.log('?? Serveur Pixel Wars pr�t sur le port ' + process.env.PORT));
+        server.listen(process.env.PORT, () => console.log('?? Serveur Pixel Wars prêt sur le port ' + process.env.PORT));
     } catch (e) {
         console.error('FATAL ERROR:', e);
     }
