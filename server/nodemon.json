@@ -1,7 +1,4 @@
 {
   "ignore": [
-    "grid.json",
-    "users.db",
-    "users.db-journal"
   ]
 }

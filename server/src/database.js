@@ -3,12 +3,12 @@ const path = require('path');
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 
-// Le dossier de données par défaut est /app/data pour Docker, sinon le dossier parent du serveur
-if (!fs.existsSync(process.env.DATA_DIR)) {
-    fs.mkdirSync(process.env.DATA_DIR, { recursive: true });
-}
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../data');
 
-const DATA_FILE = path.join(process.env.DATA_DIR, 'grid.json');
+// Le dossier de données par défaut est /app/data pour Docker, sinon le dossier parent du serveur
+if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
 const state = {
     pixels: {},
@@ -20,7 +20,7 @@ const state = {
 
 async function initDB() {
     state.db = await open({
-        filename: path.join(process.env.DATA_DIR, 'game.db'),
+        filename: path.join(DATA_DIR, 'game.db'),
         driver: sqlite3.Database
     });
 
@@ -43,11 +43,6 @@ async function initDB() {
             PRIMARY KEY (x, y)
         );
     `);
-
-    // Suppression du vieux JSON si il existe encore
-    if (fs.existsSync(DATA_FILE)) {
-        try { fs.unlinkSync(DATA_FILE); } catch(e){}
-    }
 
     // Chargement des pixels en mémoire
     const pixels = await state.db.all("SELECT * FROM pixels");
