@@ -99,6 +99,8 @@ function setupSockets(io, state, JWT_SECRET) {
 
     io.on('connection', (socket) => {
         const username = socket.username;
+        let lastActionTime = 0;
+        const ACTION_COOLDOWN = 100; // 100ms entre chaque action pour éviter le spam par bot/script
 
         // Si c'est un bot, on l'initialise s'il n'existe pas encore
         if (socket.isBot && !state.users[username]) {
@@ -154,8 +156,18 @@ function setupSockets(io, state, JWT_SECRET) {
         });
 
         socket.on('place-pixel', ({ x, y, color, faction, isBomb, isNuke }) => {
+            const now = Date.now();
+            if (now - lastActionTime < ACTION_COOLDOWN) return; // Anti-spam
+            lastActionTime = now;
+
             const isAdmin = user.isAdmin === 1;
             const userFaction = isAdmin ? (faction || user.team) : (user.team || faction);
+            
+            // Validation simple des coordonnées pour la sécurité
+            if (typeof x !== 'number' || typeof y !== 'number' || x < 0 || x >= state.GRID_SIZE || y < 0 || y >= state.GRID_SIZE) {
+                return;
+            }
+
             let cost = 5;
             if (isNuke) cost = 100;
             else if (isBomb) cost = 20;
@@ -172,7 +184,9 @@ function setupSockets(io, state, JWT_SECRET) {
             const activeColor = FACTION_COLORS[userFaction] || color;
 
             const pixelsToUpdate = [];
-            if (isNuke) {
+            
+            // On limite les nukes/bombes pour éviter les freezes CPU si spammé
+            if (isNuke && isAdmin) {
                 // Zone NUKE dévastatrice
                 for (let dx = -9; dx <= 9; dx++) {
                     const nx = x + dx;
@@ -218,6 +232,8 @@ function setupSockets(io, state, JWT_SECRET) {
             pixelsToUpdate.forEach(({ px, py }) => {
                 const key = `${px}-${py}`;
                 const oldPixel = state.pixels[key];
+                
+                // Si le pixel appartient déjà à la faction, on ne change rien (économie d'énergie/bande passante)
                 if (oldPixel && oldPixel.faction === userFaction) return;
 
                 if (oldPixel && oldPixel.faction && state.scores[oldPixel.faction] !== undefined) {
@@ -235,7 +251,7 @@ function setupSockets(io, state, JWT_SECRET) {
                 io.emit('update-pixel-batch', { pixels: batch, isNuke, isBomb, username: username });
                 io.emit('update-scores', state.scores);
             } else if (batch.length === 1) {
-                io.emit('update-pixel', { ...batch[0], isNuke: false, isBomb: false, username: username });
+                io.emit('update-pixel', { x: batch[0].x, y: batch[0].y, color: batch[0].color, faction: batch[0].faction, isNuke: false, isBomb: false, username: username });
                 io.emit('update-scores', state.scores);
             }
 

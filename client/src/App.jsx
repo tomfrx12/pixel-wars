@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
+import msgpackParser from 'socket.io-msgpack-parser';
 
 const SERVER_URL = ''; // Utilise le proxy Vite configuré pour rediriger vers localhost:3001
 
@@ -142,7 +143,8 @@ function App() {
     if (!token) return;
 
     const newSocket = io(SERVER_URL, {
-      auth: { token }
+      auth: { token },
+      parser: msgpackParser
     });
 
     newSocket.on('connect_error', (err) => {
