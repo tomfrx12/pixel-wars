@@ -41,7 +41,6 @@ function setupSockets(io, state, JWT_SECRET) {
                         username: s.username,
                         team: u.team,
                         isAdmin: u.isAdmin === 1,
-                        isBot: !!s.isBot,
                         energy: u.energy
                     });
                 }
@@ -60,20 +59,17 @@ function setupSockets(io, state, JWT_SECRET) {
 
     io.use((socket, next) => {
         const token = socket.handshake.auth.token;
-        
-        // --- SYSTÈME DE BOTS ---
-        // Si pas de token, on vérifie si c'est un bot (via un header ou query par exemple)
-        // Pour faire simple, on va regarder s'il y a une info "isBot" dans l'auth
-        if (!token && socket.handshake.auth.isBot) {
-            socket.username = `bot_${socket.handshake.auth.botId}`;
-            socket.isBot = true;
-            return next();
-        }
 
         if (!token) return next(new Error("Accès refusé. Token manquant."));
 
         jwt.verify(token, JWT_SECRET, (err, decoded) => {
             if (err) return next(new Error("Accès refusé. Token invalide."));
+            
+            // Sécurité supplémentaire : Vérifier si l'utilisateur existe encore en base
+            if (!state.users[decoded.username]) {
+                return next(new Error("Utilisateur introuvable. Reconnectez-vous."));
+            }
+
             socket.username = decoded.username;
             next();
         });
@@ -101,17 +97,6 @@ function setupSockets(io, state, JWT_SECRET) {
         const username = socket.username;
         let lastActionTime = 0;
         const ACTION_COOLDOWN = 100; // 100ms entre chaque action pour éviter le spam par bot/script
-
-        // Si c'est un bot, on l'initialise s'il n'existe pas encore
-        if (socket.isBot && !state.users[username]) {
-            state.users[username] = {
-                energy: 100,
-                team: socket.handshake.auth.team || 'red',
-                pixelsPlaced: 0,
-                isAdmin: 0
-            };
-            console.log(`🤖 Initialisation du profil pour ${username}`);
-        }
 
         if (!state.users[username]) {
             console.log(`⌛ Rejet de ${username} (non trouvé en base)`);
@@ -186,7 +171,7 @@ function setupSockets(io, state, JWT_SECRET) {
             const pixelsToUpdate = [];
             
             // On limite les nukes/bombes pour éviter les freezes CPU si spammé
-            if (isNuke && isAdmin) {
+            if (isNuke) {
                 // Zone NUKE dévastatrice
                 for (let dx = -9; dx <= 9; dx++) {
                     const nx = x + dx;
