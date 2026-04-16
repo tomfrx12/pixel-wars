@@ -37,4 +37,4 @@ ENV DATA_DIR=/app/data
 EXPOSE 80
 
 # Commande pour démarrer le serveur (qui va gérer WebSockets, API et distribuer le Frontend)
-CMD ["node", "index.js"]
+CMD ["node", "--max-old-space-size=1024", "index.js"]
