@@ -245,12 +245,17 @@ function setupSockets(io, state, JWT_SECRET) {
 
             socket.emit('energy-update', user.energy);
             socket.emit('stats-update', { team: user.team, pixelsPlaced: user.pixelsPlaced, isAdmin: user.isAdmin === 1 });
+            
             let actionType = '🖌️ PIXEL';
             if (isNuke) actionType = '☢️ NUKE';
             else if (isBomb) actionType = '💣 BOMBE';
             
             console.log(`🎮 [${username}] ${actionType} : Faction ${userFaction}`);
-            sendAdminLog(`${actionType} : ${username} (${userFaction})`);
+            
+            // On envoie le log admin une seule fois par action (même si plusieurs pixels changent)
+            if (batch.length > 0 || !isBomb && !isNuke) {
+                sendAdminLog(`${actionType} : ${username} (${userFaction})`);
+            }
         });
 
         socket.on('disconnect', () => {
