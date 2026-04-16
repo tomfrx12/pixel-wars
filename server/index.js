@@ -12,7 +12,9 @@ const { state, initDB } = require('./src/database.js');
 const { setupAuth } = require('./src/auth.js');
 const { setupSockets } = require('./src/sockets.js');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'pixel-wars-super-secret-key-2026';
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET est requis. Définis-le dans ton fichier .env");
+}
 
 const app = express();
 
@@ -42,8 +44,8 @@ const io = new Server(server, {
 (async () => {
     try {
         await initDB();
-        setupAuth(app, state, JWT_SECRET);
-        setupSockets(io, state, JWT_SECRET);
+        setupAuth(app, state, process.env.JWT_SECRET);
+        setupSockets(io, state, process.env.JWT_SECRET);
 
         app.use(express.static(path.join(__dirname, '../client/dist')));
         app.get(/(.*)/, (req, res) => {
@@ -55,8 +57,10 @@ const io = new Server(server, {
             res.status(500).json({ error: "Erreur serveur : " + (err.message || "") });
         });
 
-        const PORT = process.env.PORT || 80;
-        server.listen(PORT, () => console.log('?? Serveur Pixel Wars pr�t sur le port ' + PORT));
+        if (!process.env.PORT) {
+            throw new Error("PORT est requis. Définis-le dans ton fichier .env");
+        }
+        server.listen(process.env.PORT, () => console.log('?? Serveur Pixel Wars pr�t sur le port ' + process.env.PORT));
     } catch (e) {
         console.error('FATAL ERROR:', e);
     }
