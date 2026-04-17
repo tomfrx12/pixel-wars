@@ -3,28 +3,26 @@ const path = require('path');
 const sqlite3 = require('sqlite3');
 const { open } = require('sqlite');
 
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../data');
-
 // Le dossier de données par défaut est /app/data pour Docker, sinon le dossier parent du serveur
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!fs.existsSync(process.env.DATA_DIR)) {
+    fs.mkdirSync(process.env.DATA_DIR, { recursive: true });
 }
 
 const state = {
     pixels: {},
     users: {},
     scores: { red: 0, blue: 0, green: 0, yellow: 0 },
-    GRID_SIZE: 200, // Retour à 200x200
+    GRID_SIZE: parseInt(process.env.GRID_SIZE),
     db: null
 };
 
 async function initDB() {
-    console.log(`📂 DATA_DIR utilisé : ${path.resolve(DATA_DIR)}`);
+    console.log(`📂 DATA_DIR utilisé : ${path.resolve(process.env.DATA_DIR)}`);
     state.db = await open({
-        filename: path.join(DATA_DIR, 'game.db'),
+        filename: path.join(process.env.DATA_DIR, 'game.db'),
         driver: sqlite3.Database
     });
-    console.log(`💾 Base de données connectée : ${path.join(DATA_DIR, 'game.db')}`);
+    console.log(`💾 Base de données connectée : ${path.join(process.env.DATA_DIR, 'game.db')}`);
 
     // Création des tables
     await state.db.exec(`

@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { z } = require('zod');
 
-function setupAuth(app, state, JWT_SECRET) {
+function setupAuth(app, state, config) {
     const authSchema = z.object({
         username: z.string()
             .min(1, "Champs manquants")
@@ -34,7 +34,7 @@ function setupAuth(app, state, JWT_SECRET) {
             );
             
             state.users[username] = { passwordHash: hashedPassword, energy: 100, team: team || '', pixelsPlaced: 0, isAdmin: userIsAdmin };
-            const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '7d' });
+            const token = jwt.sign({ username }, config.JWT_SECRET, { expiresIn: '1d' });
             res.json({ token, username });
         } catch (e) {
             if (e.code === 'SQLITE_CONSTRAINT') {
@@ -59,7 +59,7 @@ function setupAuth(app, state, JWT_SECRET) {
         const isValid = await bcrypt.compare(password, user.passwordHash);
         if (!isValid) return res.status(400).json({ error: "Mot de passe incorrect" });
 
-        const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '7d' });
+        const token = jwt.sign({ username }, config.JWT_SECRET, { expiresIn: '7d' });
         res.json({ token, username });
     });
 }

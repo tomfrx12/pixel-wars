@@ -52,7 +52,9 @@ const io = new Server(server, {
         
         const socketConfig = {
             JWT_SECRET: process.env.JWT_SECRET,
-            ACTION_COOLDOWN: parseInt(process.env.ACTION_COOLDOWN)
+            ACTION_COOLDOWN: parseInt(process.env.ACTION_COOLDOWN),
+            DATA_DIR: process.env.DATA_DIR,
+            GRID_SIZE: parseInt(process.env.GRID_SIZE)
         };
         setupSockets(io, state, socketConfig);
 
