@@ -17,27 +17,34 @@ Le code est divisé en deux parties distinctes qui fusionnent lors du déploieme
 ### 1. `client/` (Frontend)
 *   Application React gérée par Vite.
 *   En développement : Vite agit comme un proxy (redirige `/api` et WebSocket vers `localhost:3001`).
+*   Architecture Modulaire (`src/components/`) :
+    *   `GameCanvas.jsx` : Rendu haute performance (`React.memo`) avec Dual-Canvas (OffscreenCanvas). Throttling via `requestAnimationFrame`.
+    *   `Sidebar.jsx` : Contrôles d'armement, sélection de faction et affichage des scores.
+    *   `Header.jsx` : Statistiques de session et informations utilisateur.
+    *   `AdminPanel.jsx` : Logs système et contrôles de maintenance.
 *   Fonctionnalités clés : 
-    *   Barre d'énergie dynamique.
+    *   Barre d'énergie dynamique (recharge 2% par seconde).
+    *   Système de Zoom et Pan (déplacement à la souris).
     *   Survol de la grille affichant le propriétaire de chaque pixel.
-    *   Système de rôle (Joueur classique vs Admin).
-    *   Historique des logs en temps réel (réservé aux admins).
-    *   Classement de Domination.
+    *   Rendu optimisé : Redessine uniquement les pixels modifiés sur l'OffscreenCanvas.
 
 ### 2. `server/` (Backend modulaire)
-Le serveur a été refactoré pour la production et est divisé en modules fonctionnels dans `server/src/` :
-*   `index.js` : Point d'entrée. Initialise l'environnement (`dotenv`), monte les middlewares, distribue l'application React compilée (dossier `client/dist`) et capture les erreurs globales pour éviter les crashs HTML.
-*   `database.js` : Gère le chargement en RAM de `users.db` et `grid.json`, ainsi que l'enregistrement périodique (toutes les 5 sec).
-*   `auth.js` : Expose les routes REST `/api/login` et `/api/register`.
-*   `sockets.js` : Gère la logique temps réel (vérification des JWT, mise à jour de l'énergie, calcul probabiliste des impacts de bombes, changements de faction et envois logs admin).
+Le serveur est divisé en modules fonctionnels dans `server/src/` :
+*   `index.js` : Point d'entrée. Initialise la configuration globale (`serverConfig`), monte les middlewares de sécurité (Helmet, RateLimit) et gère le routage statique.
+*   `database.js` : Gère la persistance SQLite (`game.db`) pour les utilisateurs et les pixels.
+*   `auth.js` : Routes `/api/login` et `/api/register` avec validation Zod et hashage Bcrypt.
+*   `sockets.js` : Orchestration temps réel. Gère les modes d'attaque (Pixel, Bombe, Nuke), le mode Admin, les mises à jour de scores et les logs.
 
 ## 🚀 Mécaniques de Jeu
-*   **Pixels classiques** : Coûtent 5 énergies. Placés de la couleur de la faction du joueur.
-*   **Bombes** : Coûtent 30 énergies. Créent une explosion tactique avec un cœur dense (100% au centre) et des éclats probabilistes sur les bords (jusqu'à une zone de ~5x5).
+*   **Pixels classiques** : Coûtent 5 énergies.
+*   **Bombes** : Coûtent 20 énergies. Zone de dégâts ~5x5 avec dispersion probabiliste.
+*   **Nuke** : Coûtent 100 énergies (réservé aux admins ou joueurs max énergie). Zone massive 19x19.
+*   **Nuke Full Map (ADMIN)** : Disponible uniquement pour les administrateurs via un bouton dédié. Conquiert instantanément toute la grille pour la faction sélectionnée.
 *   **Système Admin** (`isAdmin: 1`) :
     *   Énergie infinie.
     *   Capacité à changer de faction en direct.
-    *   Accès à un panneau confidentiel "ADMIN LOGS" qui trace chaque connexion, déconnexion et pose de pixel/bombe.
+    *   Accès à un panneau "ADMIN LOGS" temps réel.
+    *   Contrôle total des nukes et reset de grille.
 
 ## 🐳 Déploiement Docker (Production)
 Le projet utilise une image Docker Multi-Stades qui :
