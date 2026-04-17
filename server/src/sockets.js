@@ -114,7 +114,8 @@ function setupSockets(io, state, config) {
         socket.emit('init-grid', { 
             pixels: getGridColors(), 
             gridSize: config.GRID_SIZE,
-            pixelSize: config.PIXEL_SIZE 
+            pixelSize: config.PIXEL_SIZE,
+            serverUrl: config.SERVER_URL
         });
         socket.emit('update-scores', state.scores);
         socket.emit('total-players-update', io.sockets.sockets.size);

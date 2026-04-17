@@ -55,7 +55,8 @@ const io = new Server(server, {
             ACTION_COOLDOWN: parseInt(process.env.ACTION_COOLDOWN),
             DATA_DIR: process.env.DATA_DIR,
             GRID_SIZE: parseInt(process.env.GRID_SIZE),
-            PIXEL_SIZE: parseInt(process.env.PIXEL_SIZE)
+            PIXEL_SIZE: parseInt(process.env.PIXEL_SIZE) || 4,
+            SERVER_URL: process.env.SERVER_URL || ''
         };
         setupSockets(io, state, socketConfig);
 

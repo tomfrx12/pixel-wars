@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import msgpackParser from 'socket.io-msgpack-parser';
 
+const SERVER_URL = ''; // Utilise le proxy Vite configuré pour rediriger vers localhost:3001
+
 // --- SYSTEME AUDIO OPTIMISÉ (SINGLETON) ---
 let audioCtx = null;
 const playSound = (type) => {
