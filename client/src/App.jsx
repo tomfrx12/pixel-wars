@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import msgpackParser from 'socket.io-msgpack-parser';
 import AuthScreen from './components/AuthScreen';
@@ -235,34 +235,25 @@ function App() {
       ctx.restore();
     };
 
-    // --- THROTTLING DU RENDU ---
-    // On utilise requestAnimationFrame pour s'assurer qu'on ne dessine pas plus d'une fois par frame
-    let rafId = null;
-    const requestRedraw = () => {
-      if (!rafId) {
-        rafId = requestAnimationFrame(() => {
-          drawGrid();
-          rafId = null;
-        });
-      }
-    };
-
     // On redessine quand le zoom ou l'offset change
-    requestRedraw();
+    drawGrid();
 
     socket.on('init-grid', ({ pixels, gridSize: serverGridSize, pixelSize: serverPixelSize }) => {
+      console.log('Grid init received:', { serverGridSize, serverPixelSize, pixelCount: Object.keys(pixels).length });
       if (serverGridSize) setGridSize(serverGridSize);
       if (serverPixelSize) setPixelSize(serverPixelSize);
       gridStateRef.current = pixels;
       updateOffscreen();
-      requestRedraw();
+      drawGrid();
     });
 
     socket.on('update-pixel', (pixel) => {
       const { x, y, color, faction, username: pUsername, isBomb, isNuke } = pixel;
+      console.log('Pixel update received:', { x, y, color });
+      
       gridStateRef.current[`${x}-${y}`] = { color, faction, username: pUsername };
       updateOffscreen({ [`${x}-${y}`]: { color } });
-      requestRedraw();
+      drawGrid();
 
       if (pUsername === localStorage.getItem('username')) {
         if (isNuke) {
@@ -285,7 +276,7 @@ function App() {
       });
       
       updateOffscreen(batchMap);
-      requestRedraw();
+      drawGrid();
 
       if (batchUser === localStorage.getItem('username')) {
         if (isNuke) {
@@ -356,7 +347,7 @@ function App() {
     };
   }, [socket, zoom, offset]); // Re-run si le zoom ou l'offset change
 
-  const handleWheel = useCallback((e) => {
+  const handleWheel = (e) => {
     // Le preventDefault est maintenant géré par l'addEventListener ci-dessus
     const scaleAmount = -e.deltaY * 0.001;
     const newZoom = Math.min(Math.max(zoom + scaleAmount, 0.1), 10);
@@ -372,16 +363,16 @@ function App() {
     
     setZoom(newZoom);
     setOffset({ x: newOffsetX, y: newOffsetY });
-  }, [zoom, offset, pixelSize]);
+  };
 
-  const handleMouseDown = useCallback((e) => {
+  const handleMouseDown = (e) => {
     if (e.button === 1 || e.altKey) { // Clic milieu ou Alt+Clic pour déplacer
       setIsDragging(true);
       setLastMousePos({ x: e.clientX, y: e.clientY });
     }
-  }, []);
+  };
 
-  const handleMouseMove = useCallback((e) => {
+  const handleMouseMove = (e) => {
     if (isDragging) {
       const dx = e.clientX - lastMousePos.x;
       const dy = e.clientY - lastMousePos.y;
@@ -389,13 +380,13 @@ function App() {
       setLastMousePos({ x: e.clientX, y: e.clientY });
     }
     handleCanvasMouseMove(e);
-  }, [isDragging, lastMousePos]);
+  };
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = () => {
     setIsDragging(false);
-  }, []);
+  };
 
-  const handleCanvasClick = useCallback((e) => {
+  const handleCanvasClick = (e) => {
     if (!socket || isDragging) return;
     const rect = canvasRef.current.getBoundingClientRect();
     
@@ -417,9 +408,9 @@ function App() {
       isBomb: isBombMode,
       isNuke: isNukeMode 
     });
-  }, [socket, isDragging, offset, pixelSize, zoom, gridSize, faction, isBombMode, isNukeMode]);
+  };
 
-  const handleCanvasMouseMove = useCallback((e) => {
+  const handleCanvasMouseMove = (e) => {
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     
@@ -440,7 +431,7 @@ function App() {
         hoverInfoRef.current.innerHTML = "Survolez la grille...";
       }
     }
-  }, [offset, pixelSize, zoom]);
+  };
 
   // --- RENDU : ECRAN D'AUTHENTIFICATION ---
   if (!token) {
