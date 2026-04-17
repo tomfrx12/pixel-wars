@@ -19,10 +19,12 @@ const state = {
 };
 
 async function initDB() {
+    console.log(`📂 DATA_DIR utilisé : ${path.resolve(DATA_DIR)}`);
     state.db = await open({
         filename: path.join(DATA_DIR, 'game.db'),
         driver: sqlite3.Database
     });
+    console.log(`💾 Base de données connectée : ${path.join(DATA_DIR, 'game.db')}`);
 
     // Création des tables
     await state.db.exec(`
