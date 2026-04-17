@@ -111,7 +111,11 @@ function setupSockets(io, state, config) {
 
         socket.emit('energy-update', user.energy);
         socket.emit('stats-update', { team: user.team, pixelsPlaced: user.pixelsPlaced, isAdmin: user.isAdmin === 1 });
-        socket.emit('init-grid', getGridColors());
+        socket.emit('init-grid', { 
+            pixels: getGridColors(), 
+            gridSize: config.GRID_SIZE,
+            pixelSize: config.PIXEL_SIZE 
+        });
         socket.emit('update-scores', state.scores);
         socket.emit('total-players-update', io.sockets.sockets.size);
 
@@ -139,7 +143,7 @@ function setupSockets(io, state, config) {
             }
             
             // Notification à tous les clients
-            io.emit('init-grid', {});
+            io.emit('init-grid', { pixels: {}, gridSize: state.GRID_SIZE });
             io.emit('update-scores', state.scores);
             
             console.log(`🚨 [${username}] a RÉINITIALISÉ la grille !`);

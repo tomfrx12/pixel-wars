@@ -2,11 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import msgpackParser from 'socket.io-msgpack-parser';
 
-const SERVER_URL = ''; // Utilise le proxy Vite configuré pour rediriger vers localhost:3001
-
-const GRID_SIZE = 200;
-const PIXEL_SIZE = 4; // Taille standard pour 200x200
-
 // --- SYSTEME AUDIO OPTIMISÉ (SINGLETON) ---
 let audioCtx = null;
 const playSound = (type) => {
@@ -70,6 +65,8 @@ function App() {
   const hoverInfoRef = useRef(null); // DOM ref pour optimiser les performances au survol de la souris
 
   // --- GAME STATE ---
+  const [gridSize, setGridSize] = useState(200);
+  const [pixelSize, setPixelSize] = useState(4);
   const [adminLogs, setAdminLogs] = useState([]);
   const [adminUsers, setAdminUsers] = useState([]); // Liste des connectés pour l'admin
   const [openTeams, setOpenTeams] = useState({ red: true, blue: true, green: true, yellow: true }); // État des accordéons
@@ -174,9 +171,10 @@ function App() {
     const updateOffscreen = () => {
       if (!offscreenCanvasRef.current) {
         offscreenCanvasRef.current = document.createElement('canvas');
-        offscreenCanvasRef.current.width = GRID_SIZE * PIXEL_SIZE;
-        offscreenCanvasRef.current.height = GRID_SIZE * PIXEL_SIZE;
       }
+      offscreenCanvasRef.current.width = gridSize * pixelSize;
+      offscreenCanvasRef.current.height = gridSize * pixelSize;
+
       const oCtx = offscreenCanvasRef.current.getContext('2d', { alpha: false });
       oCtx.imageSmoothingEnabled = false; // Désactiver l'anti-aliasing pour le pixel art
       
@@ -188,7 +186,7 @@ function App() {
       Object.entries(gridStateRef.current).forEach(([key, pixelInfo]) => {
         const [x, y] = key.split('-').map(Number);
         oCtx.fillStyle = pixelInfo.color || pixelInfo;
-        oCtx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+        oCtx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
       });
     };
 
@@ -216,7 +214,7 @@ function App() {
       // Bordure de la carte (Três fine et discrète en noir)
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)'; // Noir semi-transparent
       ctx.lineWidth = 1 / zoom; // Toujours 1px écran peu importe le zoom
-      ctx.strokeRect(0, 0, GRID_SIZE * PIXEL_SIZE, GRID_SIZE * PIXEL_SIZE);
+      ctx.strokeRect(0, 0, gridSize * pixelSize, gridSize * pixelSize);
 
       ctx.restore();
     };
@@ -224,7 +222,9 @@ function App() {
     // On redessine quand le zoom ou l'offset change
     requestAnimationFrame(drawGrid);
 
-    socket.on('init-grid', (pixels) => {
+    socket.on('init-grid', ({ pixels, gridSize: serverGridSize, pixelSize: serverPixelSize }) => {
+      if (serverGridSize) setGridSize(serverGridSize);
+      if (serverPixelSize) setPixelSize(serverPixelSize);
       gridStateRef.current = pixels;
       updateOffscreen();
       requestAnimationFrame(drawGrid);
@@ -240,7 +240,7 @@ function App() {
       if (offscreenCanvasRef.current) {
         const oCtx = offscreenCanvasRef.current.getContext('2d');
         oCtx.fillStyle = color;
-        oCtx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+        oCtx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
       }
       
       requestAnimationFrame(drawGrid);
@@ -266,7 +266,7 @@ function App() {
       pixels.forEach(({ x, y, color, faction, username }) => {
         gridStateRef.current[`${x}-${y}`] = { color, faction, username };
         oCtx.fillStyle = color;
-        oCtx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+        oCtx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
       });
       
       requestAnimationFrame(drawGrid);
@@ -388,10 +388,10 @@ function App() {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     
-    const x = Math.floor((mouseX - offset.x) / (PIXEL_SIZE * zoom));
-    const y = Math.floor((mouseY - offset.y) / (PIXEL_SIZE * zoom));
+    const x = Math.floor((mouseX - offset.x) / (pixelSize * zoom));
+    const y = Math.floor((mouseY - offset.y) / (pixelSize * zoom));
 
-    if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) return;
+    if (x < 0 || x >= gridSize || y < 0 || y >= gridSize) return;
 
     // Pas besoin de jouer le son ici, il sera joué à la réception de l'événement socket
     socket.emit('place-pixel', { 
@@ -411,8 +411,8 @@ function App() {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     
-    const x = Math.floor((mouseX - offset.x) / (PIXEL_SIZE * zoom));
-    const y = Math.floor((mouseY - offset.y) / (PIXEL_SIZE * zoom));
+    const x = Math.floor((mouseX - offset.x) / (pixelSize * zoom));
+    const y = Math.floor((mouseY - offset.y) / (pixelSize * zoom));
     
     // Extrait les informations sauvegardées pour ce bloc (depuis les init/updates)
     const key = `${x}-${y}`;
@@ -522,8 +522,8 @@ function App() {
         <div className="flex flex-col items-center">
           <canvas
             ref={canvasRef}
-            width={GRID_SIZE * PIXEL_SIZE}
-            height={GRID_SIZE * PIXEL_SIZE}
+            width={gridSize * pixelSize}
+            height={gridSize * pixelSize}
             onWheel={handleWheel}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
