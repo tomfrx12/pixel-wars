@@ -29,8 +29,8 @@ app.use(helmet({
 
 // Limitation du débit (Rate Limiting) pour éviter le brute force et le spam API
 const limiter = rateLimit({
-    windowMs: 5 * 60 * 1000, // 30 minutes
-    max: 20, // Limite chaque IP à 25 requêtes par windowMs
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: 10, // Limite chaque IP à 10 requêtes par windowMs
     standardHeaders: true,
     legacyHeaders: false,
 });
