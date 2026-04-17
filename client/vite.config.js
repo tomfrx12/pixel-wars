@@ -11,9 +11,9 @@ export default defineConfig({
   server: {
     host: true, // Écoute sur tout le réseau local
     proxy: {
-      '/api': 'http://localhost:3001',
+      '/api': 'http://localhost:80',
       '/socket.io': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:80',
         ws: true
       }
     }

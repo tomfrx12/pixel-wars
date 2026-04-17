@@ -1,9 +1,9 @@
-require('dotenv').config({ path: '../env' });
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const msgpackParser = require('socket.io-msgpack-parser');
