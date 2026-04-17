@@ -18,6 +18,10 @@ if (!process.env.JWT_SECRET) {
 
 const app = express();
 
+// Indiquer à Express qu'il est derrière un proxy (Docker/Nginx)
+// Requis pour express-rate-limit
+app.set('trust proxy', 1);
+
 // Sécurité HTTP
 app.use(helmet({
     contentSecurityPolicy: false, // Désactivé pour faciliter le dev/déploiement rapide, à affiner en prod
