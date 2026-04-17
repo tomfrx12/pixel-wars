@@ -1,6 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { io } from 'socket.io-client';
 import msgpackParser from 'socket.io-msgpack-parser';
+import AuthScreen from './components/AuthScreen';
+import AdminPanel from './components/AdminPanel';
+import Sidebar from './components/Sidebar';
+import GameCanvas from './components/GameCanvas';
+import Header from './components/Header';
 
 const SERVER_URL = ''; // Utilise le proxy Vite configuré pour rediriger vers localhost:3001
 
@@ -170,84 +175,95 @@ function App() {
     // --- OPTIMISATION : CACHE OFFSCREEN ---
     // On dessine l'état des pixels sur un canvas invisible une seule fois, 
     // puis le rendu principal n'a qu'à faire un seul "drawImage" très rapide.
-    const updateOffscreen = () => {
-      if (!offscreenCanvasRef.current) {
+    const updateOffscreen = (pixelsToDraw) => {
+      // S'assurer que le canvas offscreen existe et a la bonne taille
+      if (!offscreenCanvasRef.current || 
+          offscreenCanvasRef.current.width !== gridSize * pixelSize || 
+          offscreenCanvasRef.current.height !== gridSize * pixelSize) {
         offscreenCanvasRef.current = document.createElement('canvas');
+        offscreenCanvasRef.current.width = gridSize * pixelSize;
+        offscreenCanvasRef.current.height = gridSize * pixelSize;
+        
+        const oCtx = offscreenCanvasRef.current.getContext('2d', { alpha: false });
+        oCtx.imageSmoothingEnabled = false;
+        oCtx.fillStyle = '#ffffff';
+        oCtx.fillRect(0, 0, offscreenCanvasRef.current.width, offscreenCanvasRef.current.height);
+        
+        // Si on vient de le créer (ou redimensionner), on force un redraw complet
+        pixelsToDraw = null; 
       }
-      offscreenCanvasRef.current.width = gridSize * pixelSize;
-      offscreenCanvasRef.current.height = gridSize * pixelSize;
 
-      const oCtx = offscreenCanvasRef.current.getContext('2d', { alpha: false });
-      oCtx.imageSmoothingEnabled = false; // Désactiver l'anti-aliasing pour le pixel art
-      
-      // Fond blanc
-      oCtx.fillStyle = '#ffffff';
-      oCtx.fillRect(0, 0, offscreenCanvasRef.current.width, offscreenCanvasRef.current.height);
+      const oCtx = offscreenCanvasRef.current.getContext('2d');
+      oCtx.imageSmoothingEnabled = false;
 
-      // Dessiner tous les pixels du cache
-      Object.entries(gridStateRef.current).forEach(([key, pixelInfo]) => {
-        const [x, y] = key.split('-').map(Number);
-        oCtx.fillStyle = pixelInfo.color || pixelInfo;
-        oCtx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
-      });
+      if (pixelsToDraw) {
+        // Mise à jour partielle
+        Object.entries(pixelsToDraw).forEach(([key, pixelInfo]) => {
+          const [px, py] = key.split('-').map(Number);
+          oCtx.fillStyle = pixelInfo.color || pixelInfo;
+          oCtx.fillRect(px * pixelSize, py * pixelSize, pixelSize, pixelSize);
+        });
+      } else {
+        // Full redraw (fond + tous les pixels)
+        oCtx.fillStyle = '#ffffff';
+        oCtx.fillRect(0, 0, offscreenCanvasRef.current.width, offscreenCanvasRef.current.height);
+        
+        Object.entries(gridStateRef.current).forEach(([key, pixelInfo]) => {
+          const [px, py] = key.split('-').map(Number);
+          oCtx.fillStyle = pixelInfo.color || (typeof pixelInfo === 'string' ? pixelInfo : '#ffffff');
+          oCtx.fillRect(px * pixelSize, py * pixelSize, pixelSize, pixelSize);
+        });
+      }
     };
 
     const drawGrid = () => {
       if (!offscreenCanvasRef.current) updateOffscreen();
       
       ctx.save();
-      ctx.imageSmoothingEnabled = false; // Performance et netteté
+      ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      // Appliquer les transformations
       ctx.translate(offset.x, offset.y);
       ctx.scale(zoom, zoom);
 
-      // Rendu ultra-rapide du cache de pixels (un seul drawImage au lieu de 40 000 rects)
       ctx.drawImage(offscreenCanvasRef.current, 0, 0);
 
-      // Bordures des pixels (uniquement si le zoom est suffisant)
-      if (zoom > 1.5) {
-        ctx.strokeStyle = '#ddd';
-        ctx.lineWidth = 0.5 / zoom;
-        // Optionnel: on pourrait dessiner une grille ici si besoin
-      }
-
-      // Bordure de la carte (Três fine et discrète en noir)
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)'; // Noir semi-transparent
-      ctx.lineWidth = 1 / zoom; // Toujours 1px écran peu importe le zoom
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+      ctx.lineWidth = 1 / zoom;
       ctx.strokeRect(0, 0, gridSize * pixelSize, gridSize * pixelSize);
 
       ctx.restore();
     };
 
+    // --- THROTTLING DU RENDU ---
+    // On utilise requestAnimationFrame pour s'assurer qu'on ne dessine pas plus d'une fois par frame
+    let rafId = null;
+    const requestRedraw = () => {
+      if (!rafId) {
+        rafId = requestAnimationFrame(() => {
+          drawGrid();
+          rafId = null;
+        });
+      }
+    };
+
     // On redessine quand le zoom ou l'offset change
-    requestAnimationFrame(drawGrid);
+    requestRedraw();
 
     socket.on('init-grid', ({ pixels, gridSize: serverGridSize, pixelSize: serverPixelSize }) => {
       if (serverGridSize) setGridSize(serverGridSize);
       if (serverPixelSize) setPixelSize(serverPixelSize);
       gridStateRef.current = pixels;
       updateOffscreen();
-      requestAnimationFrame(drawGrid);
+      requestRedraw();
     });
 
     socket.on('update-pixel', (pixel) => {
       const { x, y, color, faction, username: pUsername, isBomb, isNuke } = pixel;
-      
-      // Mise à jour immédiate de l'état local pour une réactivité maximale
       gridStateRef.current[`${x}-${y}`] = { color, faction, username: pUsername };
-      
-      // Mise à jour incrémentale du cache
-      if (offscreenCanvasRef.current) {
-        const oCtx = offscreenCanvasRef.current.getContext('2d');
-        oCtx.fillStyle = color;
-        oCtx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
-      }
-      
-      requestAnimationFrame(drawGrid);
+      updateOffscreen({ [`${x}-${y}`]: { color } });
+      requestRedraw();
 
-      // --- FILTRE SONORE STRICT ---
       if (pUsername === localStorage.getItem('username')) {
         if (isNuke) {
           playSound('nuke');
@@ -262,18 +278,15 @@ function App() {
     });
 
     socket.on('update-pixel-batch', ({ pixels, isNuke, isBomb, username: batchUser }) => {
-      if (!offscreenCanvasRef.current) updateOffscreen();
-      const oCtx = offscreenCanvasRef.current.getContext('2d');
-      
+      const batchMap = {};
       pixels.forEach(({ x, y, color, faction, username }) => {
         gridStateRef.current[`${x}-${y}`] = { color, faction, username };
-        oCtx.fillStyle = color;
-        oCtx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+        batchMap[`${x}-${y}`] = { color };
       });
       
-      requestAnimationFrame(drawGrid);
+      updateOffscreen(batchMap);
+      requestRedraw();
 
-      // --- FILTRE SONORE BATCH STRICT ---
       if (batchUser === localStorage.getItem('username')) {
         if (isNuke) {
           playSound('nuke');
@@ -343,7 +356,7 @@ function App() {
     };
   }, [socket, zoom, offset]); // Re-run si le zoom ou l'offset change
 
-  const handleWheel = (e) => {
+  const handleWheel = useCallback((e) => {
     // Le preventDefault est maintenant géré par l'addEventListener ci-dessus
     const scaleAmount = -e.deltaY * 0.001;
     const newZoom = Math.min(Math.max(zoom + scaleAmount, 0.1), 10);
@@ -359,16 +372,16 @@ function App() {
     
     setZoom(newZoom);
     setOffset({ x: newOffsetX, y: newOffsetY });
-  };
+  }, [zoom, offset, pixelSize]);
 
-  const handleMouseDown = (e) => {
+  const handleMouseDown = useCallback((e) => {
     if (e.button === 1 || e.altKey) { // Clic milieu ou Alt+Clic pour déplacer
       setIsDragging(true);
       setLastMousePos({ x: e.clientX, y: e.clientY });
     }
-  };
+  }, []);
 
-  const handleMouseMove = (e) => {
+  const handleMouseMove = useCallback((e) => {
     if (isDragging) {
       const dx = e.clientX - lastMousePos.x;
       const dy = e.clientY - lastMousePos.y;
@@ -376,13 +389,13 @@ function App() {
       setLastMousePos({ x: e.clientX, y: e.clientY });
     }
     handleCanvasMouseMove(e);
-  };
+  }, [isDragging, lastMousePos]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     setIsDragging(false);
-  };
+  }, []);
 
-  const handleCanvasClick = (e) => {
+  const handleCanvasClick = useCallback((e) => {
     if (!socket || isDragging) return;
     const rect = canvasRef.current.getBoundingClientRect();
     
@@ -404,9 +417,9 @@ function App() {
       isBomb: isBombMode,
       isNuke: isNukeMode 
     });
-  };
+  }, [socket, isDragging, offset, pixelSize, zoom, gridSize, faction, isBombMode, isNukeMode]);
 
-  const handleCanvasMouseMove = (e) => {
+  const handleCanvasMouseMove = useCallback((e) => {
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     
@@ -427,280 +440,86 @@ function App() {
         hoverInfoRef.current.innerHTML = "Survolez la grille...";
       }
     }
-  };
+  }, [offset, pixelSize, zoom]);
 
   // --- RENDU : ECRAN D'AUTHENTIFICATION ---
   if (!token) {
     return (
-      <div className="bg-[#1a1a1a] min-h-screen text-white font-mono flex flex-col items-center justify-center p-5">
-        <h1 className="text-[#00ff00] text-5xl font-bold mb-10 drop-shadow-[0_0_10px_rgba(0,255,0,0.8)]">
-          {">"} PIXEL_WARS_OS
-        </h1>
-        <div className="bg-[#222] border-2 border-[#333] p-8 rounded shadow-[0_0_20px_rgba(0,0,0,0.8)] w-[350px]">
-          <h2 className="text-[#00ff00] text-xl font-bold mb-6 text-center">
-            {authMode === 'login' ? '--- CONNEXION ---' : '--- INSCRIPTION ---'}
-          </h2>
-          
-          {authError && <p className="text-[#ff4444] mb-4 text-sm text-center font-bold">{authError}</p>}
-          
-          <form onSubmit={handleAuth} className="flex flex-col gap-4">
-            <div>
-              <label className="text-xs text-gray-400">PSEUDO (3 à 15 car.)</label>
-              <input 
-                type="text" 
-                value={authForm.username} 
-                onChange={e => setAuthForm({...authForm, username: e.target.value})}
-                className="w-full bg-[#1a1a1a] border border-gray-600 text-white px-3 py-2 outline-none focus:border-[#00ff00]"
-                required minLength={3} maxLength={15}
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-400">MOT DE PASSE</label>
-              <input 
-                type="password" 
-                value={authForm.password} 
-                onChange={e => setAuthForm({...authForm, password: e.target.value})}
-                className="w-full bg-[#1a1a1a] border border-gray-600 text-white px-3 py-2 outline-none focus:border-[#00ff00]"
-                required
-              />
-            </div>
-            {authMode === 'register' && (
-              <div>
-                <label className="text-xs text-gray-400">FACTION COULEUR</label>
-                <select 
-                  value={authForm.team} 
-                  onChange={e => setAuthForm({...authForm, team: e.target.value})}
-                  className="w-full bg-[#1a1a1a] border border-gray-600 text-white px-3 py-2 outline-none focus:border-[#00ff00]"
-                >
-                  <option value="red">Rouge</option>
-                  <option value="blue">Bleu</option>
-                  <option value="green">Vert</option>
-                  <option value="yellow">Jaune</option>
-                </select>
-              </div>
-            )}
-            
-            <button type="submit" className="bg-[#00ff00] text-black font-bold py-2 mt-4 hover:bg-[#00cc00] transition-colors cursor-pointer">
-              {authMode === 'login' ? 'ENTRER' : 'REJOINDRE LA GUERRE'}
-            </button>
-          </form>
-
-          <button 
-            onClick={() => { setAuthMode(authMode === 'login' ? 'register' : 'login'); setAuthError(''); }}
-            className="w-full mt-6 text-xs text-gray-400 hover:text-white underline cursor-pointer"
-          >
-            {authMode === 'login' ? "Je n'ai pas de compte. M'inscrire." : "J'ai déjà un compte. Me connecter."}
-          </button>
-        </div>
-      </div>
+      <AuthScreen 
+        authMode={authMode}
+        authForm={authForm}
+        setAuthForm={setAuthForm}
+        handleAuth={handleAuth}
+        authError={authError}
+        setAuthMode={setAuthMode}
+        setAuthError={setAuthError}
+      />
     );
   }
 
   // --- RENDU : ECRAN DU JEU ---
   return (
-    <div className={`min-h-screen bg-[#1a1a1a] text-white font-mono flex flex-col items-center p-5 transition-colors duration-200 ${isNukeTriggered ? '!bg-white blur-sm' : ''}`}>
+    <div className={`min-h-screen bg-[#0a0a0a] text-white font-mono flex flex-col items-center p-5 transition-colors duration-200 ${isNukeTriggered ? '!bg-white blur-sm' : ''}`}>
       
-      {/* Header contenant le nom du joueur et bouton QUITTER */}
-      <div className={`w-full max-w-[1200px] flex justify-between items-center mb-6 transition-opacity ${isNukeTriggered ? 'opacity-0' : 'opacity-100'}`}>
-        <h1 className="text-[#00ff00] text-3xl font-bold drop-shadow-[0_0_10px_rgba(0,255,0,0.8)]">
-          {">"} PIXEL_WARS_OS.exe
-        </h1>
-        <div className="flex items-center gap-4">
-          <span className="text-[#00ff00] text-xs font-bold bg-[#1a1a1a] border border-[#333] px-3 py-1 rounded-full animate-pulse shadow-[0_0_5px_rgba(0,255,0,0.3)]">
-            ● {totalPlayers} CONNECTÉS
-          </span>
-          <span className="text-gray-400 text-sm border border-gray-600 px-3 py-1 rounded bg-[#222]">
-            {isAdmin ? "👑 ADMIN :" : "ACCÈS AUTORISÉ :"} <span className={`font-bold`} style={{ color: FACTION_COLORS[myTeam] || '#00ff00' }}>{username}</span> ({myPixelsPlaced} pixels)
-          </span>
-          <button onClick={handleLogout} className="border border-[#ff4444] text-[#ff4444] px-4 py-1 text-sm rounded hover:bg-[#ff4444] hover:text-white transition-colors font-bold cursor-pointer">
-            EXIT
-          </button>
-        </div>
-      </div>
+      <Header 
+        totalPlayers={totalPlayers}
+        username={username}
+        myTeam={myTeam}
+        myPixelsPlaced={myPixelsPlaced}
+        isAdmin={isAdmin}
+        FACTION_COLORS={FACTION_COLORS}
+        onLogout={handleLogout}
+        isNukeTriggered={isNukeTriggered}
+      />
 
-      <div className={`flex flex-col lg:flex-row gap-10 items-start transition-transform ${isNukeTriggered ? 'scale-[1.1] rotate-1' : 'scale-100'}`}>
+      <div className={`flex flex-col lg:flex-row gap-8 items-start transition-transform ${isNukeTriggered ? 'scale-[1.1] rotate-1' : 'scale-100'}`}>
         
         {/* Colonne de gauche: Le Canvas */}
-        <div className="flex flex-col items-center">
-          <canvas
-            ref={canvasRef}
-            width={gridSize * pixelSize}
-            height={gridSize * pixelSize}
-            onWheel={handleWheel}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onClick={handleCanvasClick}
-            onMouseLeave={() => { 
-                if (hoverInfoRef.current) hoverInfoRef.current.innerHTML = "Survolez la grille...";
-                setIsDragging(false); 
-            }}
-            className={`border-[3px] border-[#333] shadow-[0_0_20px_rgba(0,0,0,0.5)] bg-white cursor-crosshair [image-rendering:pixelated] transition-all ${isNukeTriggered ? 'border-white shadow-[0_0_50px_#fff]' : ''}`}
-            style={{ width: '800px', height: '800px' }} // Taille fixe pour l'affichage, le zoom gère l'intérieur
-          />
-          {/* Panneau d'informations du pixel survolé (Visible pour tous) */}
-          <div 
-            ref={hoverInfoRef}
-            className="h-8 mt-2 text-sm text-[#00ff00] font-bold flex items-center justify-center"
-          >
-            Survolez la grille...
-          </div>
-        </div>
+        <GameCanvas 
+          canvasRef={canvasRef}
+          gridSize={gridSize}
+          pixelSize={pixelSize}
+          handleWheel={handleWheel}
+          handleMouseDown={handleMouseDown}
+          handleMouseMove={handleMouseMove}
+          handleMouseUp={handleMouseUp}
+          handleCanvasClick={handleCanvasClick}
+          hoverInfoRef={hoverInfoRef}
+          isNukeTriggered={isNukeTriggered}
+        />
 
         {/* Colonne de droite: Les Contrôles UI */}
-        <div className="flex flex-col w-[600px]">
+        <div className="flex flex-col w-[350px]">
           
-          {/* Barre d'énergie */}
-          <div className="mb-6 text-center">
-            <div className="w-full h-[25px] border border-[#00ff00] relative mb-1">
-              <div 
-                className={`h-full transition-[width] duration-300 ease-in-out ${(energy >= 100 || isAdmin) ? 'bg-[#ff0000] shadow-[0_0_10px_#ff0000]' : 'bg-[#00ff00]'}`} 
-                style={{ width: isAdmin ? '100%' : `${energy}%` }} 
-              />
-              <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-black text-xs font-bold">
-                ENERGY: {isAdmin ? '∞ Admin' : `${energy}%`}
-              </span>
-            </div>
-            {error && <p className="text-[#ff4444] my-1 text-sm font-bold">{error}</p>}
-          </div>
+          <Sidebar 
+            user={username}
+            userTeam={myTeam}
+            energy={energy}
+            scores={scores}
+            onLogout={handleLogout}
+            FACTION_COLORS={FACTION_COLORS}
+            isAdmin={isAdmin}
+            faction={faction}
+            setFaction={setFaction}
+            setIsBombMode={setIsBombMode}
+            setIsNukeMode={setIsNukeMode}
+            isBombMode={isBombMode}
+            isNukeMode={isNukeMode}
+            socket={socket}
+          />
 
-          <div className="bg-[#333] p-4 rounded mb-3 shadow-[0_0_10px_rgba(0,0,0,0.5)]">
-            <span className="text-gray-200 text-sm">FACTION :</span>
-            <select 
-              value={faction} 
-              disabled={!isAdmin}
-              onChange={(e) => {
-                const newTeam = e.target.value;
-                setFaction(newTeam);
-                if (isAdmin && socket) socket.emit('change-team', newTeam);
-              }} 
-              className={`bg-[#1a1a1a] text-white border p-1.5 w-full mt-1 outline-none ${isAdmin ? 'border-[#00ff00] cursor-pointer' : 'border-gray-600 cursor-not-allowed opacity-50'}`}
-            >
-              <option value="red">🔴 TEAM RED</option>
-              <option value="blue">🔵 TEAM BLUE</option>
-              <option value="green">🟢 TEAM GREEN</option>
-              <option value="yellow">🟡 TEAM YELLOW</option>
-            </select>
-          </div>
+          {error && <p className="text-[#ff4444] my-2 text-xs font-bold animate-pulse uppercase text-center bg-red-900/20 p-2 border border-red-900">{error}</p>}
 
-          <div className="bg-[#333] p-4 rounded mb-3 shadow-[0_0_10px_rgba(0,0,0,0.5)]">
-            <span className="text-gray-200 text-sm">OUTIL :</span>
-            <div className="flex flex-col gap-2 mt-2">
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => { setIsBombMode(false); setIsNukeMode(false); }}
-                  className={`flex-1 py-1 px-2 text-sm font-bold border transition-colors cursor-pointer ${(!isBombMode && !isNukeMode) ? 'bg-[#00ff00] text-black border-[#00ff00]' : 'bg-[#1a1a1a] text-white border-gray-500 hover:border-[#00ff00]'}`}
-                >
-                  PIXEL (5)
-                </button>
-                <button 
-                  onClick={() => { setIsBombMode(true); setIsNukeMode(false); }}
-                  className={`flex-1 py-1 px-2 text-sm font-bold border transition-colors cursor-pointer ${isBombMode ? 'bg-[#ffaa00] text-black border-[#ffaa00]' : 'bg-[#1a1a1a] text-white border-gray-500 hover:border-[#ffaa00]'}`}
-                >
-                  BOMBE (20)
-                </button>
-              </div>
-              <button 
-                onClick={() => { setIsNukeMode(true); setIsBombMode(false); }}
-                className={`w-full py-1.5 px-2 text-sm font-bold border transition-all cursor-pointer ${isNukeMode ? 'bg-[#ff0000] text-white border-[#ff0000] animate-pulse shadow-[0_0_10px_#ff0000]' : 'bg-[#1a1a1a] text-[#ff4444] border-[#ff4444] hover:bg-[#ff4444] hover:text-white'}`}
-              >
-                ☢️ NUKE (100)
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-[#222] p-4 rounded border border-[#444] shadow-[0_0_10px_rgba(0,0,0,0.5)]">
-            <p className="text-[#00ff00] mb-2 font-bold text-center">--- DOMINATION ---</p>
-            <div className="space-y-1">
-              {[
-                { id: 'red', name: '🔴 Red', score: scores.red || 0 },
-                { id: 'blue', name: '🔵 Blue', score: scores.blue || 0 },
-                { id: 'green', name: '🟢 Green', score: scores.green || 0 },
-                { id: 'yellow', name: '🟡 Yellow', score: scores.yellow || 0 }
-              ]
-                .sort((a, b) => b.score - a.score)
-                .map((team, index) => (
-                  <div key={team.id} className="flex justify-between text-sm">
-                    <span>
-                      {index === 0 && '👑 '}
-                      {team.name}:
-                    </span>
-                    <span className="font-bold">{team.score} px</span>
-                  </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ESPACE ADMIN LOGS */}
-          {isAdmin && (
-            <div className="mt-4 flex flex-col gap-3">
-              <div className="bg-[#111] p-3 rounded border border-[#00ff00] shadow-[0_0_15px_rgba(0,255,0,0.2)]">
-                <p className="text-[#00ff00] mb-3 font-bold text-xs text-center uppercase tracking-widest">--- JOUEURS CONNECTÉS ---</p>
-                
-                <div className="space-y-2 h-[400px] overflow-y-auto pr-1 custom-scrollbar">
-                  {['red', 'blue', 'green', 'yellow'].map(teamId => {
-                    const teamUsers = adminUsers.filter(u => u.team === teamId);
-                    const isOpen = openTeams[teamId];
-                    
-                    return (
-                      <div key={teamId} className="border border-gray-800 rounded overflow-hidden">
-                        {/* Header Accordéon */}
-                        <button 
-                          onClick={() => setOpenTeams(prev => ({ ...prev, [teamId]: !prev[teamId] }))}
-                          className="w-full flex justify-between items-center p-2 bg-[#1a1a1a] hover:bg-[#222] transition-colors cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: FACTION_COLORS[teamId] }}></div>
-                            <span className="text-[10px] font-bold uppercase" style={{ color: FACTION_COLORS[teamId] }}>
-                              TEAM {teamId} ({teamUsers.length})
-                            </span>
-                          </div>
-                          <span className="text-[10px] text-gray-500">{isOpen ? '▼' : '▶'}</span>
-                        </button>
-
-                        {/* Contenu Accordéon */}
-                        {isOpen && (
-                          <div className="p-1 bg-black/30 space-y-1">
-                            {teamUsers.length === 0 ? (
-                              <div className="text-[9px] text-gray-600 italic p-1">Aucun joueur...</div>
-                            ) : (
-                              teamUsers.map((u, i) => (
-                                <div key={i} className="flex justify-between items-center p-1.5 rounded bg-[#151515] border border-gray-900/50">
-                                  <div className="flex items-center gap-2">
-                                    <span className={`text-[10px] ${u.isBot ? 'text-blue-400 italic' : 'text-white'}`}>
-                                      {u.username} {u.isAdmin && '👑'}
-                                    </span>
-                                  </div>
-                                  <span className="text-[9px] text-gray-500">⚡{u.energy}%</span>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <button 
-                onClick={handleResetGrid}
-                className="w-full bg-[#ff0000] text-white py-2 rounded font-bold hover:bg-[#cc0000] transition-colors border-2 border-white/20 shadow-[0_0_10px_rgba(255,0,0,0.5)] cursor-pointer text-xs uppercase"
-              >
-                🚨 RÉINITIALISER LA GRILLE
-              </button>
-              
-              <div className="bg-[#111] p-3 rounded border border-red-500 shadow-[0_0_10px_rgba(255,0,0,0.3)]">
-                <p className="text-red-500 mb-2 font-bold text-xs text-center uppercase tracking-widest">--- ADMIN LOGS ---</p>
-                <div className="space-y-1 h-32 overflow-y-auto text-[10px] text-gray-300 font-mono">
-                  {adminLogs.length === 0 ? <span className="text-gray-500 opacity-50 italic text-center block">Attente de logs...</span> : null}
-                  {adminLogs.map((log, i) => (
-                    <div key={i} className="border-b border-gray-900 pb-1 last:border-0 hover:text-white transition-colors">{log}</div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+          {/* ESPACE ADMIN PANNEAU */}
+          <AdminPanel 
+            isAdmin={isAdmin}
+            adminUsers={adminUsers}
+            openTeams={openTeams}
+            setOpenTeams={setOpenTeams}
+            handleResetGrid={handleResetGrid}
+            adminLogs={adminLogs}
+            FACTION_COLORS={FACTION_COLORS}
+          />
 
         </div>
       </div>
